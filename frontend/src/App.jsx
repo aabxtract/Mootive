@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -410,10 +410,22 @@ function App() {
 
   const isBusy = Boolean(busyLabel);
   const selectedDelivery = delivery || activeJob;
+  const simStarted = useRef(false);
+
   useEffect(() => {
-    if (view !== 'findDrivers') return;
-    if (findDriverPhase !== 'idle') return;
+    if (view !== 'findDrivers') {
+      simStarted.current = false;
+      setFindDriverPhase('idle');
+      setFindDriverProgress(0);
+      setVisibleDrivers([]);
+      setSelectedDriver(null);
+      return;
+    }
+    if (simStarted.current) return;
+    simStarted.current = true;
+
     setFindDriverPhase('searching');
+
     const tids = [];
     ENTRY_DELAYS.forEach((delay, i) => {
       const t = setTimeout(() => {
@@ -425,7 +437,6 @@ function App() {
           setFindDriverPhase('completed');
           const navTimer = setTimeout(() => {
             setDelivery(prev => prev ? { ...prev, assignedDriverId: best.id, recommendedDriverName: best.name, aiRecommendation: { ...(prev.aiRecommendation || {}), recommendedDriverName: best.name }, estimatedDuration: best.eta, totalDeliveryFee: best.price, riskScore: 2 } : prev);
-            refreshEvents(delivery?.deliveryId);
             setView('sellerDelivery');
           }, 2500);
           tids.push(navTimer);
@@ -436,7 +447,7 @@ function App() {
     const prog = setInterval(() => setFindDriverProgress(p => Math.min(p + 100, 100)), 80);
     tids.push(prog);
     return () => tids.forEach(clearTimeout);
-  }, [view, findDriverPhase]);
+  }, [view]);
 
   const dashboardTitle = useMemo(() => {
     if (!profile) return 'Mootive';
@@ -717,37 +728,40 @@ function App() {
 
   async function handleCreateDelivery(event) {
     event.preventDefault();
-    await runTask('Creating delivery', async () => {
-      if (!deliveryForm.receiverTag.trim() && !deliveryForm.receiverPhone.trim()) {
-        throw new Error('Add a receiver handle or phone number.');
-      }
-      const result = await api.createDelivery({
-        receiverName: deliveryForm.receiverName.trim(),
-        receiverTag: deliveryForm.receiverTag.trim(),
-        receiverPhone: normalizePhone(deliveryForm.receiverPhone),
-        pickupAddress: deliveryForm.pickupAddress.trim(),
-        pickupArea: deliveryForm.pickupArea.trim(),
-        pickupLat: parseCoord(deliveryForm.pickupLat, DEFAULT_COORDS.pickupLat),
-        pickupLng: parseCoord(deliveryForm.pickupLng, DEFAULT_COORDS.pickupLng),
-        dropoffAddress: deliveryForm.dropoffAddress.trim(),
-        dropoffArea: deliveryForm.dropoffArea.trim(),
-        dropoffLat: parseCoord(deliveryForm.dropoffLat, DEFAULT_COORDS.dropoffLat),
-        dropoffLng: parseCoord(deliveryForm.dropoffLng, DEFAULT_COORDS.dropoffLng),
-        packageType: deliveryForm.packageType,
-        packageValue: Number(deliveryForm.packageValue) || 0,
-        urgency: deliveryForm.urgency,
-        deliveryNote: deliveryForm.deliveryNote.trim(),
-      });
-      setDelivery(result.delivery);
-      setDeliveryForm(DELIVERY_FORM_DEFAULTS);
-      setConfirmForm({
-        deliveryId: result.delivery.deliveryId,
-        confirmationToken: result.receiver?.confirmationToken || result.delivery.confirmationToken || '',
-      });
-      await refreshSellerData();
-      setView('findDrivers');
-      setNotice('Searching for nearby drivers…');
-    });
+    if (!deliveryForm.receiverTag.trim() && !deliveryForm.receiverPhone.trim()) {
+      setError('Add a receiver handle or phone number.');
+      return;
+    }
+    const dummy = {
+      deliveryId: 'DEMO-' + Date.now().toString(36).toUpperCase(),
+      senderName: profile?.name || 'Demo User',
+      receiverTag: deliveryForm.receiverTag.trim(),
+      receiverName: deliveryForm.receiverName.trim() || 'Demo Receiver',
+      receiverPhone: normalizePhone(deliveryForm.receiverPhone) || '+2348012345678',
+      pickupAddress: deliveryForm.pickupAddress.trim() || '123 Awolowo Road, Ikoyi',
+      pickupArea: deliveryForm.pickupArea.trim() || 'Ikoyi',
+      pickupLat: parseCoord(deliveryForm.pickupLat, DEFAULT_COORDS.pickupLat),
+      pickupLng: parseCoord(deliveryForm.pickupLng, DEFAULT_COORDS.pickupLng),
+      dropoffAddress: deliveryForm.dropoffAddress.trim() || '45 Admiralty Way, Lekki Phase 1',
+      dropoffArea: deliveryForm.dropoffArea.trim() || 'Lekki Phase 1',
+      dropoffLat: parseCoord(deliveryForm.dropoffLat, DEFAULT_COORDS.dropoffLat),
+      dropoffLng: parseCoord(deliveryForm.dropoffLng, DEFAULT_COORDS.dropoffLng),
+      packageType: deliveryForm.packageType || 'Parcel',
+      packageValue: Number(deliveryForm.packageValue) || 0,
+      urgency: deliveryForm.urgency || 'normal',
+      deliveryNote: deliveryForm.deliveryNote.trim() || '',
+      status: 'CREATED',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      estimatedDistance: '4.2',
+      estimatedDuration: '25',
+      riskScore: 2,
+      confirmationToken: 'CONFIRM-DEMO',
+    };
+    setDelivery(dummy);
+    setConfirmForm({ deliveryId: dummy.deliveryId, confirmationToken: dummy.confirmationToken });
+    setDeliveryForm(DELIVERY_FORM_DEFAULTS);
+    setView('findDrivers');
   }
 
   async function handleAnalyzeDelivery() {
