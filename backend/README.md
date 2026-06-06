@@ -1,265 +1,136 @@
 # Mootive AWS Backend
 
-This backend is migrated to an **actual AWS serverless scaffold** using:
+Serverless backend aligned to `BACKEND.md`.
 
-- `AWS SAM`
-- `AWS Lambda`
-- `API Gateway HTTP API`
-- `DynamoDB`
+## Stack
 
-It is no longer an Express simulation.
-
-## What is included
-
-- `template.yaml` for infrastructure
-- Lambda handler in `backend/src/app.js`
-- DynamoDB access via AWS SDK v3
-- auto-seeding for demo users and riders
-- rule-based rider recommendation logic
-- dispute ticket flow
-- required hackathon AWS tags
+- **Amazon Cognito** — email + password auth, JWT authorizer on the HTTP API
+- **API Gateway HTTP API** — JWT-authorized routes, public confirm + health
+- **AWS Lambda (Node.js 20)** — single function `mootive-api`, routes split into `src/routes/*`
+- **DynamoDB** — 5 tables (`MootiveUsers`, `MootiveDrivers`, `MootiveDeliveries`, `MootiveDeliveryEvents`, `MootiveRoutes`) with GSIs for sender, receiver, driver, status, availability, events-by-delivery
+- **Amazon Bedrock** — Claude Haiku 4.5 (`anthropic.claude-haiku-4-5-20251001-v1:0`) for explanations
+- **Amazon Location Service** — HERE route calculator for real distance/duration/geometry
 
 ## Required AWS tags
 
-Provisioned resources are tagged with:
+- General resources: `aws-apn-id=pc:8l8gcn23lmlgammd8572tk6va`, `event=oneWithAI`
+- Bedrock-invoking resources (the Lambda): `aws-apn-id=pc:a8xnp70u5w0s41039u52e6iuj`, `event=oneWithAI`
 
-- `aws-apn-id=pc:8l8gcn23lmlgammd8572tk6va`
-- `event=oneWithAI`
+## Roles
 
-For future Bedrock or GenAI resources, use:
-
-- `aws-apn-id=pc:a8xnp70u5w0s41039u52e6iuj`
-- `event=oneWithAI`
-
-## Prerequisites
-
-Install locally:
-
-- Node.js
-- AWS CLI
-- AWS SAM CLI
-
-Configure AWS:
-
-```bash
-aws configure
+```
+seller_receiver  → seller + receiver dashboard
+driver           → driver dashboard
 ```
 
-Recommended region from your brief:
+## Delivery state machine
 
-```bash
-us-east-1
+```
+CREATED → ANALYZED → OPEN_FOR_DRIVERS → DRIVER_ACCEPTED
+       → ROUTE_OPTIMIZED → PICKED_UP → IN_TRANSIT
+       → DELIVERED → CONFIRMED → COMPLETED
+(any non-terminal state → ISSUE_REPORTED)
 ```
 
-## Install
+`POST /deliveries` chains `CREATED → ANALYZED → OPEN_FOR_DRIVERS` in one call.
+
+## Endpoints
+
+All routes require a Cognito ID token in `Authorization: Bearer <jwt>` **except**:
+- `GET /health`
+- `POST /deliveries/{deliveryId}/confirm` (token-based for unregistered receivers)
+
+### Users
+```
+POST   /users/profile           create app profile after Cognito signup
+GET    /users/me                current profile (from JWT)
+PATCH  /users/me                update name/phone/username
+GET    /users/check?tag=...     receiver lookup by username or phone
+```
+
+### Drivers
+```
+POST   /drivers/profile             create driver profile (role must be driver)
+GET    /drivers/me                  current driver
+PATCH  /drivers/availability        {available, lat, lng, currentArea}
+GET    /drivers/jobs/open           OPEN_FOR_DRIVERS jobs
+GET    /drivers/jobs/accepted       jobs assigned to me
+POST   /drivers/jobs/{id}/accept    first-driver-wins (atomic conditional update)
+```
+
+### Deliveries
+```
+POST   /deliveries                          create + auto-analyze + open to drivers
+GET    /deliveries/sent                     sender = me
+GET    /deliveries/incoming                 receiver = me
+GET    /deliveries/{id}
+POST   /deliveries/{id}/analyze             re-run AI scoring + Claude explanations
+POST   /deliveries/{id}/optimize-route      Amazon Location Service + Claude route note
+POST   /deliveries/{id}/status              {status} — guarded by state machine
+GET    /deliveries/{id}/events              full event timeline
+POST   /deliveries/{id}/confirm             receiver confirms (auth OR confirmationToken)
+POST   /deliveries/{id}/report-issue        any participant → ISSUE_REPORTED
+```
+
+## AI
+
+`POST /deliveries/{id}/analyze` (also called internally by `POST /deliveries`):
+
+1. **Deterministic scoring** in `src/routes/ai.js`:
+   - Weighted score: trust 0.5, pickup time 0.3, price 0.2
+   - Risk: package value + urgency + distance
+   - Fair price: ±8% around mean of available driver estimates
+2. **Claude Haiku 4.5** produces 4 short explanations: driver pick, fair price, risk, route note
+3. Claude **explains, never decides** — driver assignment, status, and routes are all backend-owned
+
+If Bedrock fails, the endpoint returns scored output with a templated fallback explanation.
+
+## Routing
+
+`POST /deliveries/{id}/optimize-route` calls Amazon Location Service `CalculateRoute` against the provisioned `mootive-route-calculator` (HERE), persists geometry to `MootiveRoutes`, and writes `aiRouteExplanation` via Bedrock. Falls back to Haversine distance if Location Service is unavailable.
+
+## Deploy
 
 ```bash
 cd backend
 npm install
-```
-
-## Validate locally
-
-```bash
 npm run check
-```
-
-## Build and deploy
-
-```bash
 sam build
 sam deploy --guided
 ```
 
-Suggested guided deploy values:
-
+Suggested values:
 - Stack name: `mootive-backend`
 - Region: `us-east-1`
-- Confirm changes before deploy: `Y`
 - Allow SAM CLI IAM role creation: `Y`
-- Disable rollback: `N`
-- Save arguments to configuration file: `Y`
 
-## Infrastructure
+Note `UserPoolId`, `UserPoolClientId`, `ApiUrl` from the outputs.
 
-`template.yaml` creates:
+## Seed demo users
 
-- 1 Lambda function
-- 1 HTTP API
-- 4 DynamoDB tables:
-  - `MootiveUsers`
-  - `MootiveDeliveries`
-  - `MootiveRiders`
-  - `MootiveTickets`
-
-## API routes
-
-### Health
-- `GET /health`
-
-### Users
-- `POST /users`
-- `GET /users`
-- `GET /users/{tag}`
-- `GET /users/{tag}/incoming`
-
-### Deliveries
-- `POST /deliveries`
-- `GET /deliveries`
-- `GET /deliveries/{deliveryId}`
-- `POST /deliveries/{deliveryId}/select-rider`
-- `POST /deliveries/{deliveryId}/simulate-payment`
-- `POST /deliveries/{deliveryId}/status`
-- `PATCH /deliveries/{deliveryId}/status`
-- `POST /deliveries/{deliveryId}/confirm`
-- `POST /deliveries/{deliveryId}/tickets`
-- `GET /deliveries/{deliveryId}/tickets`
-
-### Riders and recommendation
-- `GET /riders`
-- `POST /riders/find`
-- `POST /recommend-rider`
-
-## Data flow mapping
-
-### Fake Login
-- Frontend calls `POST /users`
-- Lambda creates or reuses a user in DynamoDB
-- Response returns `userId`
-
-### Create Delivery
-- Frontend calls `POST /deliveries`
-- Lambda creates a delivery record in DynamoDB
-- Receiver is checked from the registry
-- Missing receivers get a confirmation link
-
-### Rider Discovery
-- Frontend calls `POST /riders/find`
-- Lambda returns seeded riders from DynamoDB
-
-### Recommendation
-- Frontend calls `POST /recommend-rider`
-- Lambda calculates:
-  - fair price estimate
-  - best rider recommendation
-  - delivery risk score
-  - route note
-
-### Rider Selection
-- Frontend calls `POST /deliveries/{deliveryId}/select-rider`
-- Lambda attaches the selected rider to the delivery
-
-### Payment Simulation
-- Frontend calls `POST /deliveries/{deliveryId}/simulate-payment`
-- Lambda creates the 60/40 payout state
-
-### Delivery Tracking
-- Frontend calls `POST` or `PATCH /deliveries/{deliveryId}/status`
-- Lambda updates the delivery status
-- On `Picked Up`, 60% is released
-
-### Receiver Confirmation
-- Frontend calls `POST /deliveries/{deliveryId}/confirm`
-- Lambda marks the delivery completed
-- Remaining 40% is released
-
-### Dispute Simulation
-- Frontend calls `POST /deliveries/{deliveryId}/tickets`
-- Lambda creates a ticket in DynamoDB
-
-## Auto-seeding
-
-The Lambda auto-seeds the first time it needs empty tables:
-
-- 4 users
-- 5 riders
-
-You can also seed manually after deployment:
+After deploy, the user pool is empty. Run:
 
 ```bash
+USER_POOL_ID=<from-outputs> \
+USERS_TABLE=MootiveUsers \
+DRIVERS_TABLE=MootiveDrivers \
 npm run seed:demo
 ```
 
-## Example curl
+Creates:
+- 1 seller_receiver (`tara@mootive.test`)
+- 2 drivers (`kunle@mootive.test` in Yaba, `ifeanyi@mootive.test` in Lekki)
 
-```bash
-API_URL="https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com"
-```
+All accounts use password `MootiveDemo1!`.
 
-Create user:
+## Auth flow for the frontend
 
-```bash
-curl -X POST "$API_URL/users" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Tara Styles","phoneNumber":"08000000000","username":"tarastyles"}'
-```
+1. Cognito `InitiateAuth` with `USER_PASSWORD_AUTH` using `UserPoolClientId`
+2. On signup, after email verification, call `POST /users/profile` with `{name, role, username, phoneNumber}`
+3. Subsequent calls send `Authorization: Bearer <IdToken>`
 
-Create delivery:
+## What is real vs simulated
 
-```bash
-curl -X POST "$API_URL/deliveries" \
-  -H "Content-Type: application/json" \
-  -d '{"senderId":"USR-DEMO","receiverTag":"@amaka","pickupLocation":"Yaba","dropoffLocation":"Lekki Phase 1","receiverName":"Amaka","receiverPhone":"08111111111","packageType":"Fashion item","packageValue":25000,"urgency":"same day","deliveryNote":"Call receiver before arrival"}'
-```
+**Real:** Cognito auth, user/driver profiles, role-based dashboards, delivery creation, driver job visibility, atomic job acceptance, Claude on Bedrock, Amazon Location Service routes, status state machine, event timeline, receiver confirmation, issue reporting.
 
-Find riders:
-
-```bash
-curl -X POST "$API_URL/riders/find" \
-  -H "Content-Type: application/json" \
-  -d '{"deliveryId":"DLV-EXAMPLE"}'
-```
-
-Recommend rider:
-
-```bash
-curl -X POST "$API_URL/recommend-rider" \
-  -H "Content-Type: application/json" \
-  -d '{"deliveryId":"DLV-EXAMPLE"}'
-```
-
-Select rider:
-
-```bash
-curl -X POST "$API_URL/deliveries/DLV-EXAMPLE/select-rider" \
-  -H "Content-Type: application/json" \
-  -d '{"riderId":"rider_B"}'
-```
-
-Simulate payment:
-
-```bash
-curl -X POST "$API_URL/deliveries/DLV-EXAMPLE/simulate-payment" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-
-Update status:
-
-```bash
-curl -X POST "$API_URL/deliveries/DLV-EXAMPLE/status" \
-  -H "Content-Type: application/json" \
-  -d '{"status":"Picked Up"}'
-```
-
-Confirm delivery:
-
-```bash
-curl -X POST "$API_URL/deliveries/DLV-EXAMPLE/confirm" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-
-Raise ticket:
-
-```bash
-curl -X POST "$API_URL/deliveries/DLV-EXAMPLE/tickets" \
-  -H "Content-Type: application/json" \
-  -d '{"reason":"Receiver has not confirmed delivery."}'
-```
-
-## Important note
-
-I converted the backend into a real AWS deployable structure, but I could not
-deploy it from this environment because `aws` CLI and `sam` CLI are not installed
-here yet.
+**Simulated:** SMS sending (`smsStatus: SIMULATED_SENT`), payment release (`totalDeliveryFee` stored, no money moved), live GPS streaming (drivers ping `PATCH /drivers/availability` for location).

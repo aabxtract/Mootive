@@ -1,39 +1,94 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Mootive backend for the One With AI hackathon
+Description: Mootive backend for the One With AI hackathon — Cognito + Lambda + DynamoDB + Bedrock + Amazon Location Service
+
+Parameters:
+  ApnId:
+    Type: String
+    Default: pc:8l8gcn23lmlgammd8572tk6va
+  ApnIdGenAi:
+    Type: String
+    Default: pc:a8xnp70u5w0s41039u52e6iuj
+  EventTag:
+    Type: String
+    Default: oneWithAI
+  BedrockModelId:
+    Type: String
+    Default: anthropic.claude-haiku-4-5-20251001-v1:0
 
 Globals:
   Function:
     Runtime: nodejs20.x
-    Timeout: 15
-    MemorySize: 256
+    Timeout: 20
+    MemorySize: 512
     Environment:
       Variables:
         USERS_TABLE: !Ref UsersTable
+        DRIVERS_TABLE: !Ref DriversTable
         DELIVERIES_TABLE: !Ref DeliveriesTable
-        RIDERS_TABLE: !Ref RidersTable
-        TICKETS_TABLE: !Ref TicketsTable
-    Tags:
-      aws-apn-id: pc:8l8gcn23lmlgammd8572tk6va
-      event: oneWithAI
+        EVENTS_TABLE: !Ref DeliveryEventsTable
+        ROUTES_TABLE: !Ref RoutesTable
+        USER_POOL_ID: !Ref UserPool
+        USER_POOL_CLIENT_ID: !Ref UserPoolClient
+        BEDROCK_MODEL_ID: !Ref BedrockModelId
+        LOCATION_ROUTE_CALCULATOR: !Ref RouteCalculator
 
 Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: mootive-user-pool
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: false
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+      UserPoolTags:
+        aws-apn-id: !Ref ApnId
+        event: !Ref EventTag
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: mootive-web-client
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+
   MootiveApi:
     Type: AWS::Serverless::HttpApi
     Properties:
+      PropagateTags: true
       CorsConfiguration:
-        AllowOrigins:
-          - "*"
-        AllowHeaders:
-          - Content-Type
-        AllowMethods:
-          - GET
-          - POST
-          - PATCH
-          - OPTIONS
+        AllowOrigins: ["*"]
+        AllowHeaders: [Content-Type, Authorization]
+        AllowMethods: [GET, POST, PATCH, OPTIONS]
+      Auth:
+        Authorizers:
+          CognitoJwt:
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
+              audience:
+                - !Ref UserPoolClient
+            IdentitySource: $request.header.Authorization
+        DefaultAuthorizer: CognitoJwt
       Tags:
-        aws-apn-id: pc:8l8gcn23lmlgammd8572tk6va
-        event: oneWithAI
+        aws-apn-id: !Ref ApnId
+        event: !Ref EventTag
 
   MootiveFunction:
     Type: AWS::Serverless::Function
@@ -41,124 +96,102 @@ Resources:
       FunctionName: mootive-api
       CodeUri: .
       Handler: src/app.handler
+      PropagateTags: true
+      Tags:
+        aws-apn-id: !Ref ApnIdGenAi
+        event: !Ref EventTag
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
+            TableName: !Ref DriversTable
+        - DynamoDBCrudPolicy:
             TableName: !Ref DeliveriesTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref RidersTable
+            TableName: !Ref DeliveryEventsTable
         - DynamoDBCrudPolicy:
-            TableName: !Ref TicketsTable
+            TableName: !Ref RoutesTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModelId}
+            - Effect: Allow
+              Action:
+                - geo:CalculateRoute
+              Resource: !GetAtt RouteCalculator.CalculatorArn
       Events:
+        # Public — no auth
         Health:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /health
-            Method: GET
-        CreateUser:
+          Properties: { ApiId: !Ref MootiveApi, Path: /health, Method: GET, Auth: { Authorizer: NONE } }
+        PublicConfirm:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /users
-            Method: POST
-        ListUsers:
+          Properties: { ApiId: !Ref MootiveApi, Path: "/deliveries/{deliveryId}/confirm", Method: POST, Auth: { Authorizer: NONE } }
+
+        # Users
+        CreateProfile:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /users
-            Method: GET
-        GetUser:
+          Properties: { ApiId: !Ref MootiveApi, Path: /users/profile, Method: POST }
+        GetMe:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /users/{tag}
-            Method: GET
-        IncomingDeliveries:
+          Properties: { ApiId: !Ref MootiveApi, Path: /users/me, Method: GET }
+        UpdateMe:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /users/{tag}/incoming
-            Method: GET
+          Properties: { ApiId: !Ref MootiveApi, Path: /users/me, Method: PATCH }
+        CheckReceiver:
+          Type: HttpApi
+          Properties: { ApiId: !Ref MootiveApi, Path: /users/check, Method: GET }
+
+        # Drivers
+        CreateDriverProfile:
+          Type: HttpApi
+          Properties: { ApiId: !Ref MootiveApi, Path: /drivers/profile, Method: POST }
+        GetDriverMe:
+          Type: HttpApi
+          Properties: { ApiId: !Ref MootiveApi, Path: /drivers/me, Method: GET }
+        UpdateAvailability:
+          Type: HttpApi
+          Properties: { ApiId: !Ref MootiveApi, Path: /drivers/availability, Method: PATCH }
+        OpenJobs:
+          Type: HttpApi
+          Properties: { ApiId: !Ref MootiveApi, Path: /drivers/jobs/open, Method: GET }
+        AcceptedJobs:
+          Type: HttpApi
+          Properties: { ApiId: !Ref MootiveApi, Path: /drivers/jobs/accepted, Method: GET }
+        AcceptJob:
+          Type: HttpApi
+          Properties: { ApiId: !Ref MootiveApi, Path: "/drivers/jobs/{deliveryId}/accept", Method: POST }
+
+        # Deliveries
         CreateDelivery:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries
-            Method: POST
-        ListDeliveries:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries
-            Method: GET
+          Properties: { ApiId: !Ref MootiveApi, Path: /deliveries, Method: POST }
         GetDelivery:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries/{deliveryId}
-            Method: GET
-        ListRiders:
+          Properties: { ApiId: !Ref MootiveApi, Path: "/deliveries/{deliveryId}", Method: GET }
+        SentDeliveries:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /riders
-            Method: GET
-        FindRiders:
+          Properties: { ApiId: !Ref MootiveApi, Path: /deliveries/sent, Method: GET }
+        IncomingDeliveries:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /riders/find
-            Method: POST
-        RecommendRider:
+          Properties: { ApiId: !Ref MootiveApi, Path: /deliveries/incoming, Method: GET }
+        Analyze:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /recommend-rider
-            Method: POST
-        SelectRider:
+          Properties: { ApiId: !Ref MootiveApi, Path: "/deliveries/{deliveryId}/analyze", Method: POST }
+        OptimizeRoute:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries/{deliveryId}/select-rider
-            Method: POST
-        SimulatePayment:
+          Properties: { ApiId: !Ref MootiveApi, Path: "/deliveries/{deliveryId}/optimize-route", Method: POST }
+        UpdateStatus:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries/{deliveryId}/simulate-payment
-            Method: POST
-        UpdateStatusPost:
+          Properties: { ApiId: !Ref MootiveApi, Path: "/deliveries/{deliveryId}/status", Method: POST }
+        Events:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries/{deliveryId}/status
-            Method: POST
-        UpdateStatusPatch:
+          Properties: { ApiId: !Ref MootiveApi, Path: "/deliveries/{deliveryId}/events", Method: GET }
+        ReportIssue:
           Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries/{deliveryId}/status
-            Method: PATCH
-        ConfirmDelivery:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries/{deliveryId}/confirm
-            Method: POST
-        RaiseTicket:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries/{deliveryId}/tickets
-            Method: POST
-        GetTicket:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref MootiveApi
-            Path: /deliveries/{deliveryId}/tickets
-            Method: GET
+          Properties: { ApiId: !Ref MootiveApi, Path: "/deliveries/{deliveryId}/report-issue", Method: POST }
 
   UsersTable:
     Type: AWS::DynamoDB::Table
@@ -166,16 +199,47 @@ Resources:
       TableName: MootiveUsers
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
+        - { AttributeName: userId, AttributeType: S }
+        - { AttributeName: cognitoSub, AttributeType: S }
+        - { AttributeName: username, AttributeType: S }
+        - { AttributeName: phoneNumber, AttributeType: S }
       KeySchema:
-        - AttributeName: userId
-          KeyType: HASH
+        - { AttributeName: userId, KeyType: HASH }
+      GlobalSecondaryIndexes:
+        - IndexName: cognitoSub-index
+          KeySchema: [{ AttributeName: cognitoSub, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+        - IndexName: username-index
+          KeySchema: [{ AttributeName: username, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+        - IndexName: phoneNumber-index
+          KeySchema: [{ AttributeName: phoneNumber, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
       Tags:
-        - Key: aws-apn-id
-          Value: pc:8l8gcn23lmlgammd8572tk6va
-        - Key: event
-          Value: oneWithAI
+        - { Key: aws-apn-id, Value: !Ref ApnId }
+        - { Key: event, Value: !Ref EventTag }
+
+  DriversTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: MootiveDrivers
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: driverId, AttributeType: S }
+        - { AttributeName: userId, AttributeType: S }
+        - { AttributeName: availabilityStatus, AttributeType: S }
+      KeySchema:
+        - { AttributeName: driverId, KeyType: HASH }
+      GlobalSecondaryIndexes:
+        - IndexName: userId-index
+          KeySchema: [{ AttributeName: userId, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+        - IndexName: availability-index
+          KeySchema: [{ AttributeName: availabilityStatus, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+      Tags:
+        - { Key: aws-apn-id, Value: !Ref ApnId }
+        - { Key: event, Value: !Ref EventTag }
 
   DeliveriesTable:
     Type: AWS::DynamoDB::Table
@@ -183,62 +247,173 @@ Resources:
       TableName: MootiveDeliveries
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: deliveryId
-          AttributeType: S
+        - { AttributeName: deliveryId, AttributeType: S }
+        - { AttributeName: senderId, AttributeType: S }
+        - { AttributeName: receiverId, AttributeType: S }
+        - { AttributeName: assignedDriverId, AttributeType: S }
+        - { AttributeName: status, AttributeType: S }
       KeySchema:
-        - AttributeName: deliveryId
-          KeyType: HASH
+        - { AttributeName: deliveryId, KeyType: HASH }
+      GlobalSecondaryIndexes:
+        - IndexName: senderId-index
+          KeySchema: [{ AttributeName: senderId, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+        - IndexName: receiverId-index
+          KeySchema: [{ AttributeName: receiverId, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+        - IndexName: assignedDriverId-index
+          KeySchema: [{ AttributeName: assignedDriverId, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+        - IndexName: status-index
+          KeySchema: [{ AttributeName: status, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
       Tags:
-        - Key: aws-apn-id
-          Value: pc:8l8gcn23lmlgammd8572tk6va
-        - Key: event
-          Value: oneWithAI
+        - { Key: aws-apn-id, Value: !Ref ApnId }
+        - { Key: event, Value: !Ref EventTag }
 
-  RidersTable:
+  DeliveryEventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: MootiveRiders
+      TableName: MootiveDeliveryEvents
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: riderId
-          AttributeType: S
+        - { AttributeName: eventId, AttributeType: S }
+        - { AttributeName: deliveryId, AttributeType: S }
+        - { AttributeName: createdAt, AttributeType: S }
       KeySchema:
-        - AttributeName: riderId
-          KeyType: HASH
+        - { AttributeName: eventId, KeyType: HASH }
+      GlobalSecondaryIndexes:
+        - IndexName: deliveryId-createdAt-index
+          KeySchema:
+            - { AttributeName: deliveryId, KeyType: HASH }
+            - { AttributeName: createdAt, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
       Tags:
-        - Key: aws-apn-id
-          Value: pc:8l8gcn23lmlgammd8572tk6va
-        - Key: event
-          Value: oneWithAI
+        - { Key: aws-apn-id, Value: !Ref ApnId }
+        - { Key: event, Value: !Ref EventTag }
 
-  TicketsTable:
+  RoutesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: MootiveTickets
+      TableName: MootiveRoutes
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: ticketId
-          AttributeType: S
+        - { AttributeName: routeId, AttributeType: S }
+        - { AttributeName: deliveryId, AttributeType: S }
       KeySchema:
-        - AttributeName: ticketId
-          KeyType: HASH
+        - { AttributeName: routeId, KeyType: HASH }
+      GlobalSecondaryIndexes:
+        - IndexName: deliveryId-index
+          KeySchema: [{ AttributeName: deliveryId, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+      Tags:
+        - { Key: aws-apn-id, Value: !Ref ApnId }
+        - { Key: event, Value: !Ref EventTag }
+
+  RouteCalculator:
+    Type: AWS::Location::RouteCalculator
+    Properties:
+      CalculatorName: mootive-route-calculator
+      DataSource: Here
+      PricingPlan: RequestBasedUsage
+      Tags:
+        - { Key: aws-apn-id, Value: !Ref ApnId }
+        - { Key: event, Value: !Ref EventTag }
+
+  MootiveMap:
+    Type: AWS::Location::Map
+    Properties:
+      MapName: mootive-map
+      Configuration:
+        Style: VectorEsriNavigation
+      PricingPlan: RequestBasedUsage
+      Tags:
+        - { Key: aws-apn-id, Value: !Ref ApnId }
+        - { Key: event, Value: !Ref EventTag }
+
+  MootivePlaceIndex:
+    Type: AWS::Location::PlaceIndex
+    Properties:
+      IndexName: mootive-places
+      DataSource: Esri
+      PricingPlan: RequestBasedUsage
+      Tags:
+        - { Key: aws-apn-id, Value: !Ref ApnId }
+        - { Key: event, Value: !Ref EventTag }
+
+  IdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: mootive_identity_pool
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+        - ClientId: !Ref UserPoolClient
+          ProviderName: !GetAtt UserPool.ProviderName
+          ServerSideTokenCheck: true
+      IdentityPoolTags:
+        - Key: aws-apn-id
+          Value: !Ref ApnId
+        - Key: event
+          Value: !Ref EventTag
+
+  IdentityPoolAuthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: mootive-identity-auth-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Federated: cognito-identity.amazonaws.com }
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals: { "cognito-identity.amazonaws.com:aud": !Ref IdentityPool }
+              "ForAnyValue:StringLike": { "cognito-identity.amazonaws.com:amr": authenticated }
+      Policies:
+        - PolicyName: location-access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - geo:GetMapTile
+                  - geo:GetMapStyleDescriptor
+                  - geo:GetMapSprites
+                  - geo:GetMapGlyphs
+                Resource: !GetAtt MootiveMap.Arn
+              - Effect: Allow
+                Action:
+                  - geo:SearchPlaceIndexForText
+                  - geo:SearchPlaceIndexForSuggestions
+                  - geo:SearchPlaceIndexForPosition
+                Resource: !GetAtt MootivePlaceIndex.Arn
       Tags:
         - Key: aws-apn-id
-          Value: pc:8l8gcn23lmlgammd8572tk6va
+          Value: !Ref ApnId
         - Key: event
-          Value: oneWithAI
+          Value: !Ref EventTag
+
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        authenticated: !GetAtt IdentityPoolAuthRole.Arn
 
 Outputs:
   ApiUrl:
-    Description: HTTP API endpoint
     Value: !Sub https://${MootiveApi}.execute-api.${AWS::Region}.amazonaws.com
-  FunctionName:
-    Value: !Ref MootiveFunction
-  UsersTableName:
-    Value: !Ref UsersTable
-  DeliveriesTableName:
-    Value: !Ref DeliveriesTable
-  RidersTableName:
-    Value: !Ref RidersTable
-  TicketsTableName:
-    Value: !Ref TicketsTable
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  RouteCalculatorName:
+    Value: !Ref RouteCalculator
+  IdentityPoolId:
+    Value: !Ref IdentityPool
+  MapName:
+    Value: !Ref MootiveMap
+  PlaceIndexName:
+    Value: !Ref MootivePlaceIndex
+  Region:
+    Value: !Ref AWS::Region
