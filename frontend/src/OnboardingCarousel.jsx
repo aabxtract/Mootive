@@ -34,9 +34,9 @@ export default function OnboardingCarousel({ onComplete, onReset, showReset = fa
   }
 
   return (
-    <div className="min-h-screen bg-white text-black">
-      <main className="mx-auto flex h-screen w-full max-w-[430px] flex-col overflow-hidden bg-white shadow-xl sm:my-4 sm:h-[calc(100vh-2rem)] sm:rounded-lg sm:border sm:border-black/10">
-        <header className="flex items-center justify-between px-5 pb-2 pt-5">
+    <div className="screen-height overflow-hidden bg-white text-black">
+      <main className="app-shell-height mx-auto flex w-full max-w-[430px] flex-col overflow-hidden bg-white shadow-xl sm:my-4 sm:rounded-lg sm:border sm:border-black/10">
+        <header className="flex shrink-0 items-center justify-between px-4 pb-2 pt-4 min-[380px]:px-5 min-[380px]:pt-5">
           <img src={LOGO} alt="Mootive" className="h-10 w-10 object-contain opacity-90" />
           <button
             type="button"
@@ -47,24 +47,24 @@ export default function OnboardingCarousel({ onComplete, onReset, showReset = fa
           </button>
         </header>
 
-        <section className="min-h-0 flex-1 overflow-hidden">
+        <section className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           <div
-            className="flex h-full transition-transform duration-500 ease-out"
+            className="flex min-h-full transition-transform duration-500 ease-out"
             style={{ transform: `translateX(-${activeSlide * 100}%)` }}
           >
             {SLIDES.map((slide) => (
-              <article key={slide.title} className="flex h-full w-full shrink-0 flex-col items-center justify-center px-7 text-center">
-                <div className="flex h-64 w-full items-center justify-center rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+              <article key={slide.title} className="flex min-h-full w-full shrink-0 flex-col items-center justify-center px-5 py-4 text-center min-[380px]:px-7">
+                <div className="flex h-44 w-full items-center justify-center rounded-lg border border-black/10 bg-white p-3 shadow-sm min-[380px]:h-56 min-[420px]:h-64 min-[380px]:p-4">
                   <img src={slide.image} alt="" className="max-h-full w-full object-contain" />
                 </div>
-                <h1 className="mt-9 text-3xl font-black leading-tight text-black">{slide.title}</h1>
-                <p className="mt-4 max-w-80 text-base font-semibold leading-7 text-black/70">{slide.description}</p>
+                <h1 className="mt-6 text-2xl font-black leading-tight text-black min-[380px]:mt-8 min-[380px]:text-3xl">{slide.title}</h1>
+                <p className="mt-3 max-w-80 text-sm font-semibold leading-6 text-black/70 min-[380px]:mt-4 min-[380px]:text-base min-[380px]:leading-7">{slide.description}</p>
               </article>
             ))}
           </div>
         </section>
 
-        <footer className="space-y-5 px-5 pb-7 pt-4">
+        <footer className="shrink-0 space-y-4 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 min-[380px]:space-y-5 min-[380px]:px-5 min-[380px]:pb-[max(1.75rem,env(safe-area-inset-bottom))] min-[380px]:pt-4">
           <div className="flex justify-center gap-2">
             {SLIDES.map((slide, index) => (
               <button

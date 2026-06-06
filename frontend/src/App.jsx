@@ -161,19 +161,19 @@ function statusTone(status) {
 
 function Shell({ children, error, notice, busyLabel }) {
   return (
-    <div className="min-h-screen bg-white text-black">
-      <main className="mx-auto flex h-screen w-full max-w-[430px] flex-col bg-white shadow-xl sm:my-4 sm:h-[calc(100vh-2rem)] sm:rounded-lg sm:border sm:border-black/10">
+    <div className="screen-height overflow-hidden bg-white text-black">
+      <main className="app-shell-height mx-auto flex w-full max-w-[430px] flex-col overflow-hidden bg-white shadow-xl sm:my-4 sm:rounded-lg sm:border sm:border-black/10">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {(error || notice || busyLabel) && (
-            <div className="border-b border-slate-200 bg-white px-4 py-3">
+            <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-3 min-[380px]:px-4">
               {busyLabel && (
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {busyLabel}
+                <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-700">
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  <span className="min-w-0 truncate">{busyLabel}</span>
                 </div>
               )}
-              {error && !busyLabel && <p className="text-sm font-semibold text-rose-700">{error}</p>}
-              {notice && !error && !busyLabel && <p className="text-sm font-semibold text-emerald-700">{notice}</p>}
+              {error && !busyLabel && <p className="break-words text-sm font-semibold text-rose-700">{error}</p>}
+              {notice && !error && !busyLabel && <p className="break-words text-sm font-semibold text-emerald-700">{notice}</p>}
             </div>
           )}
           {children}
@@ -185,7 +185,7 @@ function Shell({ children, error, notice, busyLabel }) {
 
 function TopBar({ title, subtitle, onBack, onLogout, action }) {
   return (
-    <header className="border-b border-slate-200 bg-white px-4 py-4">
+    <header className="shrink-0 border-b border-slate-200 bg-white px-3 py-3 min-[380px]:px-4 min-[380px]:py-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           {onBack && (
@@ -199,17 +199,17 @@ function TopBar({ title, subtitle, onBack, onLogout, action }) {
             </button>
           )}
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-black text-slate-950">{title}</h1>
+            <h1 className="truncate text-base font-black text-slate-950 min-[380px]:text-lg">{title}</h1>
             {subtitle && <p className="truncate text-sm font-medium text-slate-500">{subtitle}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {action}
           {onLogout && (
             <button
               type="button"
               onClick={onLogout}
-              className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700"
               aria-label="Sign out"
             >
               <LogOut className="h-5 w-5" />
@@ -233,11 +233,11 @@ function Button({ children, icon: Icon, variant = 'primary', className = '', dis
     <button
       type="button"
       disabled={disabled}
-      className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border px-4 text-sm font-bold transition disabled:opacity-50 ${styles[variant]} ${className}`}
+      className={`flex min-h-12 w-full min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-bold transition disabled:opacity-50 min-[380px]:px-4 ${styles[variant]} ${className}`}
       {...props}
     >
-      {Icon && <Icon className="h-4 w-4" />}
-      <span className="truncate">{children}</span>
+      {Icon && <Icon className="h-4 w-4 shrink-0" />}
+      <span className="min-w-0 truncate">{children}</span>
     </button>
   );
 }
@@ -245,9 +245,9 @@ function Button({ children, icon: Icon, variant = 'primary', className = '', dis
 function Field({ label, icon: Icon, className = '', ...props }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
-        {Icon && <Icon className="h-4 w-4" />}
-        {label}
+      <span className="mb-2 flex min-w-0 items-center gap-2 text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
+        {Icon && <Icon className="h-4 w-4 shrink-0" />}
+        <span className="min-w-0 truncate">{label}</span>
       </span>
       <input
         className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3 text-base font-semibold text-slate-950 outline-none focus:border-slate-950"
@@ -285,7 +285,7 @@ function TextArea({ label, ...props }) {
 
 function StatusBadge({ status }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-extrabold ${statusTone(status)}`}>
+    <span className={`inline-flex max-w-full items-center truncate whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-extrabold ${statusTone(status)}`}>
       {STATUS_LABELS[status] || status || 'Pending'}
     </span>
   );
@@ -293,21 +293,21 @@ function StatusBadge({ status }) {
 
 function Metric({ label, value, icon: Icon }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <div className="flex items-center gap-2 text-slate-500">
-        {Icon && <Icon className="h-4 w-4" />}
-        <p className="text-xs font-bold uppercase tracking-[0.08em]">{label}</p>
+    <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="flex min-w-0 items-center gap-2 text-slate-500">
+        {Icon && <Icon className="h-4 w-4 shrink-0" />}
+        <p className="min-w-0 truncate text-xs font-bold uppercase tracking-[0.08em]">{label}</p>
       </div>
-      <p className="mt-2 text-base font-black text-slate-950">{value}</p>
+      <p className="mt-2 break-words text-sm font-black text-slate-950 min-[380px]:text-base">{value}</p>
     </div>
   );
 }
 
 function InfoRow({ label, value }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-bold text-slate-900">{value || 'Pending'}</p>
+      <p className="mt-1 break-words text-sm font-bold text-slate-900">{value || 'Pending'}</p>
     </div>
   );
 }
@@ -325,11 +325,11 @@ function EmptyState({ title, body, icon: Icon = Package }) {
 function MapPreview({ delivery }) {
   return (
     <div className="map-grid relative min-h-40 overflow-hidden rounded-lg border border-slate-200">
-      <div className="absolute left-6 top-6 rounded-lg bg-white px-3 py-2 shadow-sm">
+      <div className="absolute left-3 top-4 max-w-[8.5rem] rounded-lg bg-white px-3 py-2 shadow-sm min-[380px]:left-6 min-[380px]:top-6 min-[380px]:max-w-40">
         <p className="text-xs font-black text-emerald-700">Pickup</p>
         <p className="max-w-40 truncate text-sm font-bold text-slate-900">{delivery?.pickupArea || delivery?.pickupAddress || 'Pickup'}</p>
       </div>
-      <div className="absolute bottom-6 right-6 rounded-lg bg-white px-3 py-2 shadow-sm">
+      <div className="absolute bottom-4 right-3 max-w-[8.5rem] rounded-lg bg-white px-3 py-2 shadow-sm min-[380px]:bottom-6 min-[380px]:right-6 min-[380px]:max-w-40">
         <p className="text-xs font-black text-rose-700">Dropoff</p>
         <p className="max-w-40 truncate text-sm font-bold text-slate-900">{delivery?.dropoffArea || delivery?.dropoffAddress || 'Dropoff'}</p>
       </div>
@@ -345,18 +345,20 @@ function DeliveryCard({ delivery, onClick, actionLabel, actionIcon: ActionIcon =
     <button
       type="button"
       onClick={() => onClick?.(delivery)}
-      className="w-full rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm"
+      className="w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm min-[380px]:p-4"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-col items-start gap-2 min-[360px]:flex-row min-[360px]:justify-between min-[360px]:gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-black text-slate-950">{delivery.deliveryId}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-600">
+          <p className="mt-1 break-words text-sm font-semibold text-slate-600">
             {delivery.pickupArea || delivery.pickupAddress} to {delivery.dropoffArea || delivery.dropoffAddress}
           </p>
         </div>
-        <StatusBadge status={delivery.status} />
+        <div className="max-w-full shrink-0">
+          <StatusBadge status={delivery.status} />
+        </div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
         <Metric label="Fee" value={formatMoney(delivery.totalDeliveryFee)} icon={Package} />
         <Metric label="Risk" value={delivery.riskScore || 'Pending'} icon={ShieldCheck} />
       </div>
@@ -876,7 +878,7 @@ function App() {
   if (view === 'loading') {
     return (
       <Shell error={error} notice={notice} busyLabel={busyLabel}>
-        <section className="grid flex-1 place-items-center px-6 text-center">
+        <section className="grid flex-1 place-items-center px-4 text-center min-[380px]:px-6">
           <div>
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-lg bg-slate-950 text-white">
               <Truck className="h-7 w-7" />
@@ -892,7 +894,7 @@ function App() {
   if (view === 'auth') {
     return (
       <Shell error={error} notice={notice} busyLabel={busyLabel}>
-        <section className="flex flex-1 flex-col overflow-y-auto px-5 py-6">
+        <section className="mobile-scroll flex flex-1 flex-col overflow-y-auto">
           <div className="mb-8">
             <div className="grid h-12 w-12 place-items-center rounded-lg bg-slate-950 text-white">
               <Truck className="h-6 w-6" />
@@ -965,8 +967,8 @@ function App() {
     return (
       <Shell error={error} notice={notice} busyLabel={busyLabel}>
         <TopBar title="Choose role" subtitle={authIdentity?.email || pendingProfile?.email} onLogout={handleLogout} />
-        <form onSubmit={handleRoleSubmit} className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-          <div className="grid grid-cols-2 gap-2">
+        <form onSubmit={handleRoleSubmit} className="mobile-scroll flex-1 space-y-5 overflow-y-auto">
+          <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
             <button
               type="button"
               onClick={() => patchRoleForm('role', 'seller_receiver')}
@@ -1024,7 +1026,7 @@ function App() {
             </button>
           )}
         />
-        <section className="flex-1 overflow-y-auto px-5 py-5">
+        <section className="mobile-scroll flex-1 overflow-y-auto">
           <Button icon={Plus} onClick={() => setView('createDelivery')}>Create delivery</Button>
           <div className="mt-5 grid grid-cols-2 rounded-lg border border-slate-200 bg-white p-1">
             <button
@@ -1072,11 +1074,11 @@ function App() {
     return (
       <Shell error={error} notice={notice} busyLabel={busyLabel}>
         <TopBar title="Create delivery" subtitle="POST /deliveries" onBack={() => setView('seller')} onLogout={handleLogout} />
-        <form onSubmit={handleCreateDelivery} className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <form onSubmit={handleCreateDelivery} className="mobile-scroll flex-1 space-y-5 overflow-y-auto">
           <section className="space-y-4">
             <h2 className="text-sm font-black uppercase tracking-[0.08em] text-slate-500">Receiver</h2>
             <Field label="Receiver name" icon={User} value={deliveryForm.receiverName} onChange={(event) => patchDeliveryForm('receiverName', event.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
               <Field label="Handle" value={deliveryForm.receiverTag} onChange={(event) => patchDeliveryForm('receiverTag', event.target.value)} placeholder="@ifeanyi" />
               <Field label="Phone" icon={Phone} type="tel" value={deliveryForm.receiverPhone} onChange={(event) => patchDeliveryForm('receiverPhone', event.target.value)} placeholder="+234..." />
             </div>
@@ -1088,7 +1090,7 @@ function App() {
             <Field label="Pickup area" value={deliveryForm.pickupArea} onChange={(event) => patchDeliveryForm('pickupArea', event.target.value)} />
             <Field label="Dropoff address" icon={MapPin} value={deliveryForm.dropoffAddress} onChange={(event) => patchDeliveryForm('dropoffAddress', event.target.value)} required />
             <Field label="Dropoff area" value={deliveryForm.dropoffArea} onChange={(event) => patchDeliveryForm('dropoffArea', event.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
               <Field label="Pickup lat" inputMode="decimal" value={deliveryForm.pickupLat} onChange={(event) => patchDeliveryForm('pickupLat', event.target.value)} />
               <Field label="Pickup lng" inputMode="decimal" value={deliveryForm.pickupLng} onChange={(event) => patchDeliveryForm('pickupLng', event.target.value)} />
               <Field label="Dropoff lat" inputMode="decimal" value={deliveryForm.dropoffLat} onChange={(event) => patchDeliveryForm('dropoffLat', event.target.value)} />
@@ -1105,7 +1107,7 @@ function App() {
               <option value="Electronics">Electronics</option>
               <option value="Documents">Documents</option>
             </SelectField>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
               <Field label="Value" inputMode="numeric" value={deliveryForm.packageValue} onChange={(event) => patchDeliveryForm('packageValue', event.target.value)} placeholder="35000" />
               <SelectField label="Urgency" value={deliveryForm.urgency} onChange={(event) => patchDeliveryForm('urgency', event.target.value)}>
                 <option value="normal">Normal</option>
@@ -1126,7 +1128,7 @@ function App() {
     const formatPrice = (n) => '₦' + n.toLocaleString('en-NG');
     return (
       <Shell>
-        <section className="flex-1 overflow-y-auto px-5 py-6">
+        <section className="mobile-scroll flex-1 overflow-y-auto">
           <div className="text-center mb-5">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-400 flex items-center justify-center shadow-lg mx-auto">
               <Sparkles size={24} className="text-white" />
@@ -1157,17 +1159,17 @@ function App() {
               const isSelected = selectedDriver?.id === driver.id;
               return (
                 <div key={driver.id} className={`rounded-2xl border p-4 transition-all duration-500 ${!isVisible ? 'opacity-0 translate-y-4 max-h-0 overflow-hidden p-0 border-transparent' : isSelected ? 'border-emerald-300 bg-emerald-50/60 shadow-md ring-1 ring-emerald-200' : 'border-slate-200 bg-white shadow-sm'}`}>
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl ${driver.color} flex items-center justify-center text-white text-sm font-bold shrink-0`}>{driver.initials}</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-slate-900">{driver.name}</p>
-                      <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-0.5">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                         <span className="inline-flex items-center gap-1"><Navigation size={10} />{driver.vehicle}</span>
                         <span className="inline-flex items-center gap-1"><Clock size={10} />{driver.eta}</span>
                         <span className="inline-flex items-center gap-1"><Star size={10} className="text-amber-400" />{driver.rating}</span>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="shrink-0 text-right">
                       <p className="text-sm font-bold text-slate-900">{formatPrice(driver.price)}</p>
                       <p className="text-[10px] text-slate-400">offer</p>
                     </div>
@@ -1212,7 +1214,7 @@ function App() {
             </button>
           )}
         />
-        <section className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <section className="mobile-scroll flex-1 space-y-5 overflow-y-auto">
           {!selectedDelivery && <EmptyState title="No delivery selected" body="Open a sent or incoming delivery first." />}
           {selectedDelivery && (
             <>
@@ -1254,8 +1256,8 @@ function App() {
             </button>
           )}
         />
-        <section className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-          <div className="grid grid-cols-2 gap-3">
+        <section className="mobile-scroll flex-1 space-y-5 overflow-y-auto">
+          <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
             <Metric label="Open jobs" value={openJobs.length} icon={Package} />
             <Metric label="Accepted" value={acceptedJobs.length} icon={Truck} />
           </div>
@@ -1308,7 +1310,7 @@ function App() {
             </button>
           )}
         />
-        <section className="flex-1 overflow-y-auto px-5 py-5 flex flex-col">
+        <section className="mobile-scroll flex flex-1 flex-col overflow-y-auto">
           {!activeJob && <EmptyState title="No active job" body="Accept an open job first." icon={Truck} />}
           {activeJob && (
             <>
@@ -1354,7 +1356,7 @@ function App() {
           onBack={() => setView(profile?.role === 'driver' ? 'driverJob' : 'seller')}
           onLogout={profile ? handleLogout : undefined}
         />
-        <section className="flex-1 overflow-y-auto px-5 py-5 flex flex-col">
+        <section className="mobile-scroll flex flex-1 flex-col overflow-y-auto">
           {!selectedDelivery && <EmptyState title="No delivery" body="Open a delivery first." />}
           {selectedDelivery && (
             <>
@@ -1395,7 +1397,7 @@ function App() {
           onBack={() => setView(profile?.role === 'driver' ? 'driver' : 'seller')}
           onLogout={profile ? handleLogout : undefined}
         />
-        <section className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <section className="mobile-scroll flex-1 space-y-5 overflow-y-auto">
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 text-center">
             <div className="mx-auto grid h-12 w-12 place-items-center rounded-lg bg-emerald-600 text-white">
               <Check className="h-6 w-6" />
@@ -1411,7 +1413,7 @@ function App() {
                 actionLabel="View details"
                 onClick={() => openDeliveryDetails(summary, profile?.role === 'driver' ? 'driverJob' : 'sellerDelivery')}
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
                 <Metric label="Fee" value={formatMoney(summary.totalDeliveryFee)} icon={Package} />
                 <Metric label="Route" value={summary.estimatedDistance ? `${summary.estimatedDistance} km` : 'Attached'} icon={Route} />
               </div>
