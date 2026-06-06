@@ -2,14 +2,15 @@
  * Seed demo data after `sam deploy`.
  *
  * Required env vars:
- *   USER_POOL_ID, USERS_TABLE, DRIVERS_TABLE   (use the values from the SAM Outputs)
+ *   USER_POOL_ID, USER_POOL_CLIENT_ID, AWS_REGION
  * Optional:
- *   AWS_REGION (defaults to us-east-1)
+ *   USERS_TABLE, DRIVERS_TABLE
  *
  * Usage:
- *   USER_POOL_ID=... USERS_TABLE=MootiveUsers DRIVERS_TABLE=MootiveDrivers \
  *   node scripts/seed-demo-data.js
  */
+
+require("dotenv").config({ quiet: true });
 
 const {
   CognitoIdentityProviderClient,
@@ -21,15 +22,26 @@ const { putItem } = require("../src/lib/dynamo");
 const { makeId } = require("../src/lib/ids");
 
 const USER_POOL_ID = process.env.USER_POOL_ID;
+const USER_POOL_CLIENT_ID = process.env.USER_POOL_CLIENT_ID;
+const AWS_REGION = process.env.AWS_REGION;
 const USERS_TABLE = process.env.USERS_TABLE || "MootiveUsers";
 const DRIVERS_TABLE = process.env.DRIVERS_TABLE || "MootiveDrivers";
 
-if (!USER_POOL_ID) {
-  console.error("USER_POOL_ID is required. Get it from `sam deploy` outputs.");
+const missingEnv = [
+  ["USER_POOL_ID", USER_POOL_ID],
+  ["USER_POOL_CLIENT_ID", USER_POOL_CLIENT_ID],
+  ["AWS_REGION", AWS_REGION],
+]
+  .filter(([, value]) => !value)
+  .map(([name]) => name);
+
+if (missingEnv.length > 0) {
+  console.error(`Missing required env variable${missingEnv.length > 1 ? "s" : ""}: ${missingEnv.join(", ")}`);
+  console.error("Create backend/.env or export them before running `npm run seed:demo`.");
   process.exit(1);
 }
 
-const cognito = new CognitoIdentityProviderClient({});
+const cognito = new CognitoIdentityProviderClient({ region: AWS_REGION });
 
 const DEMO_PASSWORD = "MootiveDemo1!";
 

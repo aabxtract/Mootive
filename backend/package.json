@@ -10,7 +10,16 @@
     "deploy:guided": "sam deploy --guided",
     "seed:demo": "node scripts/seed-demo-data.js"
   },
-  "keywords": ["mootive", "aws", "sam", "lambda", "dynamodb", "cognito", "bedrock", "location"],
+  "keywords": [
+    "mootive",
+    "aws",
+    "sam",
+    "lambda",
+    "dynamodb",
+    "cognito",
+    "bedrock",
+    "location"
+  ],
   "author": "Mootive Team",
   "license": "MIT",
   "dependencies": {
@@ -18,6 +27,7 @@
     "@aws-sdk/client-cognito-identity-provider": "^3.817.0",
     "@aws-sdk/client-dynamodb": "^3.817.0",
     "@aws-sdk/client-location": "^3.817.0",
-    "@aws-sdk/lib-dynamodb": "^3.817.0"
+    "@aws-sdk/lib-dynamodb": "^3.817.0",
+    "dotenv": "^17.4.2"
   }
 }

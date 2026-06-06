@@ -8,13 +8,11 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
-  Clock,
   Home,
   Inbox,
   Loader2,
   LocateFixed,
   LogIn,
-  Map,
   MapPin,
   Navigation,
   Package,
@@ -433,12 +431,12 @@ function Landing({ go }) {
 function AuthScreen({ mode, go, setUser }) {
   const isSignup = mode === 'signup';
   const [form, setForm] = useState({
-    name: 'Tara Styles',
-    email: 'tara@example.com',
-    phoneNumber: '0800 000 0000',
-    password: 'Password123!',
-    confirmPassword: 'Password123!',
-    username: 'tarastyles',
+    name: '',
+    email: '',
+    phoneNumber: '',
+    password: '',
+    confirmPassword: '',
+    username: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

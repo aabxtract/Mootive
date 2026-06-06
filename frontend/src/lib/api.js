@@ -34,8 +34,10 @@ export const checkUser              = (tag)     => get(`/users/check?tag=${encod
 
 // Drivers
 export const createDriverProfile    = (p)       => post('/drivers/profile', p);
+export const createRiderProfile     = createDriverProfile;
 export const getDriverMe            = ()        => get('/drivers/me');
 export const updateAvailability     = (p)       => patch('/drivers/availability', p);
+export const updateRiderAvailability = updateAvailability;
 export const getOpenJobs            = ()        => get('/drivers/jobs/open');
 export const getAcceptedJobs        = ()        => get('/drivers/jobs/accepted');
 export const acceptJob              = (id)      => post(`/drivers/jobs/${encodeURIComponent(id)}/accept`, {});

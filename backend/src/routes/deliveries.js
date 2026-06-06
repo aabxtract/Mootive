@@ -45,7 +45,7 @@ async function create(event, ctx) {
   const delivery = {
     deliveryId,
     senderId: user.userId,
-    receiverId: receiver?.userId || null,
+    receiverId: receiver?.userId,
     receiverTag: tag,
     receiverName: receiver?.name || b.receiverName || null,
     receiverPhone: receiver?.phoneNumber || phone || null,
@@ -65,7 +65,7 @@ async function create(event, ctx) {
     urgency: b.urgency || "normal",
     deliveryNote: b.deliveryNote || null,
     status: STATUSES.CREATED,
-    assignedDriverId: null,
+    assignedDriverId: undefined,
     recommendedDriverId: null,
     fairPriceMin: null,
     fairPriceMax: null,

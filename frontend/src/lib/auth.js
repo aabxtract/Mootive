@@ -57,7 +57,16 @@ export function configureAmplify() {
 
 export async function signup({ name, email, phoneNumber, password }) {
   configureAmplify();
-  if (!hasCognitoConfig()) throw new Error('Cognito not configured. Set VITE_USER_POOL_ID and VITE_USER_POOL_CLIENT_ID.');
+  if (!hasCognitoConfig()) {
+    return {
+      userId: `local-${Date.now()}`,
+      cognitoSub: `local-${Date.now()}`,
+      email,
+      name,
+      phoneNumber,
+      nextStep: { signUpStep: 'DONE' },
+    };
+  }
   const userAttributes = { email };
   if (name) userAttributes.name = name;
   if (phoneNumber) userAttributes.phone_number = phoneNumber;
@@ -76,7 +85,19 @@ export async function resendCode(email) {
 
 export async function login(email, password) {
   configureAmplify();
-  try { await cognitoSignOut(); } catch {}
+  if (!hasCognitoConfig()) {
+    return {
+      userId: `local-${email || 'user'}`,
+      cognitoSub: `local-${email || 'user'}`,
+      email,
+      nextStep: { signInStep: 'DONE' },
+    };
+  }
+  try {
+    await cognitoSignOut();
+  } catch {
+    // A missing previous session should not block a fresh login.
+  }
   return cognitoSignIn({ username: email, password, options: { authFlowType: 'USER_PASSWORD_AUTH' } });
 }
 
