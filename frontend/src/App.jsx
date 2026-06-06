@@ -1,21 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   Check,
+  CheckCircle2,
   ChevronRight,
   ClipboardCheck,
+  Clock,
   Clock3,
   Loader2,
   Lock,
   LogOut,
   Mail,
   MapPin,
+  Navigation,
   Package,
   Phone,
   Plus,
   RefreshCw,
   Route,
   ShieldCheck,
+  Sparkles,
+  Star,
   Truck,
   User,
 } from 'lucide-react';
@@ -23,6 +29,8 @@ import * as api from './lib/api';
 import * as auth from './lib/auth';
 import OnboardingCarousel from './OnboardingCarousel';
 import SplashScreen from './SplashScreen';
+import DeliveryTimeline from './components/DeliveryTimeline';
+import RouteSummaryCard from './components/RouteSummaryCard';
 
 const PENDING_PROFILE_KEY = 'mootive.pendingProfile';
 const ONBOARDING_COMPLETE_KEY = 'mootive.onboardingComplete';
@@ -57,6 +65,16 @@ const NEXT_DRIVER_STATUS = {
   PICKED_UP: 'IN_TRANSIT',
   IN_TRANSIT: 'DELIVERED',
 };
+
+const SIM_DRIVERS = [
+  { id: 'd1', name: 'Chidi Obi', initials: 'CO', vehicle: 'Motorcycle', rating: 4.8, price: 2500, eta: '8 min', color: 'bg-orange-500' },
+  { id: 'd2', name: 'Funke Adeyemi', initials: 'FA', vehicle: 'Car', rating: 4.9, price: 3200, eta: '12 min', color: 'bg-blue-500' },
+  { id: 'd3', name: 'Tunde Balogun', initials: 'TB', vehicle: 'Motorcycle', rating: 4.7, price: 2200, eta: '6 min', color: 'bg-emerald-500' },
+  { id: 'd4', name: 'Aisha Mohammed', initials: 'AM', vehicle: 'Car', rating: 4.9, price: 3000, eta: '10 min', color: 'bg-purple-500' },
+  { id: 'd5', name: 'Emeka Nwosu', initials: 'EN', vehicle: 'Motorcycle', rating: 4.6, price: 2800, eta: '15 min', color: 'bg-rose-500' },
+];
+
+const ENTRY_DELAYS = [800, 2200, 3600, 5000, 6200];
 
 const DELIVERY_FORM_DEFAULTS = {
   receiverName: '',
@@ -383,11 +401,42 @@ function App() {
   const [completedDelivery, setCompletedDelivery] = useState(null);
   const [sellerTab, setSellerTab] = useState('sent');
   const [busyLabel, setBusyLabel] = useState('');
+  const [findDriverPhase, setFindDriverPhase] = useState('idle');
+  const [findDriverProgress, setFindDriverProgress] = useState(0);
+  const [visibleDrivers, setVisibleDrivers] = useState([]);
+  const [selectedDriver, setSelectedDriver] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
   const isBusy = Boolean(busyLabel);
   const selectedDelivery = delivery || activeJob;
+  useEffect(() => {
+    if (view !== 'findDrivers') return;
+    if (findDriverPhase !== 'idle') return;
+    setFindDriverPhase('searching');
+    const tids = [];
+    ENTRY_DELAYS.forEach((delay, i) => {
+      const t = setTimeout(() => {
+        setVisibleDrivers(prev => [...prev, SIM_DRIVERS[i].id]);
+        if (i === SIM_DRIVERS.length - 1) {
+          const sorted = [...SIM_DRIVERS].sort((a, b) => (b.rating * 10000 / b.price) - (a.rating * 10000 / a.price));
+          const best = sorted[0];
+          setSelectedDriver(best);
+          setFindDriverPhase('completed');
+          const navTimer = setTimeout(() => {
+            setDelivery(prev => prev ? { ...prev, assignedDriverId: best.id, recommendedDriverName: best.name, aiRecommendation: { ...(prev.aiRecommendation || {}), recommendedDriverName: best.name }, estimatedDuration: best.eta, totalDeliveryFee: best.price, riskScore: 2 } : prev);
+            refreshEvents(delivery?.deliveryId);
+            setView('sellerDelivery');
+          }, 2500);
+          tids.push(navTimer);
+        }
+      }, delay);
+      tids.push(t);
+    });
+    const prog = setInterval(() => setFindDriverProgress(p => Math.min(p + 100, 100)), 80);
+    tids.push(prog);
+    return () => tids.forEach(clearTimeout);
+  }, [view, findDriverPhase]);
 
   const dashboardTitle = useMemo(() => {
     if (!profile) return 'Mootive';
@@ -696,9 +745,8 @@ function App() {
         confirmationToken: result.receiver?.confirmationToken || result.delivery.confirmationToken || '',
       });
       await refreshSellerData();
-      await refreshEvents(result.delivery.deliveryId);
-      setView('sellerDelivery');
-      setNotice('Delivery created and ready to analyze.');
+      setView('findDrivers');
+      setNotice('Searching for nearby drivers…');
     });
   }
 
@@ -1074,11 +1122,82 @@ function App() {
     );
   }
 
+  if (view === 'findDrivers') {
+    const formatPrice = (n) => '₦' + n.toLocaleString('en-NG');
+    return (
+      <Shell>
+        <section className="flex-1 overflow-y-auto px-5 py-6">
+          <div className="text-center mb-5">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-400 flex items-center justify-center shadow-lg mx-auto">
+              <Sparkles size={24} className="text-white" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 mt-3">
+              {findDriverPhase === 'completed' ? 'Driver found!' : 'Finding nearby drivers'}
+            </h2>
+            <div className="flex items-center justify-center gap-1.5 mt-1.5">
+              <MapPin size={12} className="text-orange-500" />
+              <p className="text-xs text-slate-500">{delivery?.pickupArea || delivery?.pickupAddress || 'your area'}</p>
+            </div>
+          </div>
+
+          <div className="w-full bg-slate-100 rounded-full h-1.5 mb-5 overflow-hidden">
+            <div className={`h-full rounded-full transition-all duration-300 ease-out ${findDriverPhase === 'completed' ? 'bg-emerald-500' : 'bg-orange-500'}`} style={{ width: `${findDriverProgress}%` }} />
+          </div>
+
+          {findDriverPhase === 'searching' && visibleDrivers.length < SIM_DRIVERS.length && (
+            <div className="flex items-center gap-2 mb-4 text-xs text-slate-500">
+              <Loader2 size={12} className="animate-spin text-orange-500" />
+              <span>Checking available riders...</span>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {SIM_DRIVERS.map((driver) => {
+              const isVisible = visibleDrivers.includes(driver.id);
+              const isSelected = selectedDriver?.id === driver.id;
+              return (
+                <div key={driver.id} className={`rounded-2xl border p-4 transition-all duration-500 ${!isVisible ? 'opacity-0 translate-y-4 max-h-0 overflow-hidden p-0 border-transparent' : isSelected ? 'border-emerald-300 bg-emerald-50/60 shadow-md ring-1 ring-emerald-200' : 'border-slate-200 bg-white shadow-sm'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl ${driver.color} flex items-center justify-center text-white text-sm font-bold shrink-0`}>{driver.initials}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-900">{driver.name}</p>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-0.5">
+                        <span className="inline-flex items-center gap-1"><Navigation size={10} />{driver.vehicle}</span>
+                        <span className="inline-flex items-center gap-1"><Clock size={10} />{driver.eta}</span>
+                        <span className="inline-flex items-center gap-1"><Star size={10} className="text-amber-400" />{driver.rating}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-slate-900">{formatPrice(driver.price)}</p>
+                      <p className="text-[10px] text-slate-400">offer</p>
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <div className="mt-3 pt-3 border-t border-emerald-200 flex items-center gap-2 text-xs text-emerald-700">
+                      <CheckCircle2 size={14} />
+                      <span className="font-bold">Best match selected</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {findDriverPhase === 'completed' && selectedDriver && (
+            <button onClick={() => { setDelivery(prev => prev ? { ...prev, assignedDriverId: selectedDriver.id, recommendedDriverName: selectedDriver.name, aiRecommendation: { ...(prev.aiRecommendation || {}), recommendedDriverName: selectedDriver.name }, estimatedDuration: selectedDriver.eta, totalDeliveryFee: selectedDriver.price, riskScore: 2 } : prev); refreshEvents(delivery?.deliveryId); setView('sellerDelivery'); }} className="w-full py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-md inline-flex items-center justify-center gap-2 active:scale-95 transition mt-5">
+              <CheckCircle2 size={16} /> Continue to tracking
+            </button>
+          )}
+        </section>
+      </Shell>
+    );
+  }
+
   if (view === 'sellerDelivery') {
     return (
       <Shell error={error} notice={notice} busyLabel={busyLabel}>
         <TopBar
-          title="Delivery details"
+          title="Delivery tracking"
           subtitle={selectedDelivery?.deliveryId}
           onBack={() => setView('seller')}
           onLogout={handleLogout}
@@ -1097,58 +1216,18 @@ function App() {
           {!selectedDelivery && <EmptyState title="No delivery selected" body="Open a sent or incoming delivery first." />}
           {selectedDelivery && (
             <>
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.08em] text-slate-400">Current status</p>
-                    <h2 className="mt-1 text-xl font-black text-slate-950">{STATUS_LABELS[selectedDelivery.status] || selectedDelivery.status}</h2>
-                  </div>
-                  <StatusBadge status={selectedDelivery.status} />
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <InfoRow label="Pickup" value={selectedDelivery.pickupAddress} />
-                  <InfoRow label="Dropoff" value={selectedDelivery.dropoffAddress} />
-                  <InfoRow label="Fee" value={formatMoney(selectedDelivery.totalDeliveryFee)} />
-                  <InfoRow label="Receiver" value={selectedDelivery.receiverName || selectedDelivery.receiverPhone || selectedDelivery.receiverTag} />
-                </div>
+              <StatusBadge status={selectedDelivery.status} />
+              <h2 className="text-lg font-bold text-slate-900 mt-1">Delivery tracking</h2>
+              <RouteSummaryCard delivery={selectedDelivery} />
+              <div>
+                <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Delivery Progress</h3>
+                <DeliveryTimeline delivery={selectedDelivery} events={events} />
               </div>
-
-              <MapPreview delivery={selectedDelivery} />
-
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-3 pt-2">
                 <Button icon={ShieldCheck} onClick={handleAnalyzeDelivery} disabled={isBusy}>Analyze delivery</Button>
                 {selectedDelivery.status === 'DELIVERED' && (
                   <Button icon={Check} variant="success" onClick={() => openReceiverConfirm(selectedDelivery)} disabled={isBusy}>Receiver confirm</Button>
                 )}
-              </div>
-
-              {selectedDelivery.aiRecommendation && (
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <h3 className="text-sm font-black text-slate-950">AI analysis</h3>
-                  <div className="mt-3 space-y-3 text-sm font-semibold text-slate-600">
-                    <p>{selectedDelivery.aiRecommendation.explanations?.driverRecommendation || 'Driver scoring attached.'}</p>
-                    <p>{selectedDelivery.aiRecommendation.explanations?.fairPrice || 'Fair price calculated.'}</p>
-                    <p>{selectedDelivery.aiRecommendation.explanations?.risk || 'Risk assessed.'}</p>
-                  </div>
-                </div>
-              )}
-
-              {(selectedDelivery.confirmationToken || confirmForm.confirmationToken) && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.08em] text-amber-700">Receiver token</p>
-                  <p className="mt-2 break-all text-sm font-black text-slate-950">{selectedDelivery.confirmationToken || confirmForm.confirmationToken}</p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <h3 className="text-sm font-black uppercase tracking-[0.08em] text-slate-500">Events</h3>
-                {events.length === 0 && <EmptyState title="No events loaded" body="Refresh the delivery to load event history." icon={Clock3} />}
-                {events.map((item) => (
-                  <div key={`${item.eventType}-${item.createdAt}`} className="rounded-lg border border-slate-200 bg-white p-3">
-                    <p className="text-sm font-black text-slate-950">{STATUS_LABELS[item.eventType] || item.eventType}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">{item.message}</p>
-                  </div>
-                ))}
               </div>
             </>
           )}
@@ -1210,10 +1289,11 @@ function App() {
 
   if (view === 'driverJob') {
     const nextStatus = NEXT_DRIVER_STATUS[activeJob?.status];
+    const driverActionLabel = nextStatus ? `Mark ${STATUS_LABELS[nextStatus]}` : null;
     return (
       <Shell error={error} notice={notice} busyLabel={busyLabel}>
         <TopBar
-          title="Driver job"
+          title="Rider route"
           subtitle={activeJob?.deliveryId}
           onBack={() => setView('driver')}
           onLogout={handleLogout}
@@ -1228,41 +1308,30 @@ function App() {
             </button>
           )}
         />
-        <section className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <section className="flex-1 overflow-y-auto px-5 py-5 flex flex-col">
           {!activeJob && <EmptyState title="No active job" body="Accept an open job first." icon={Truck} />}
           {activeJob && (
             <>
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.08em] text-slate-400">Job status</p>
-                    <h2 className="mt-1 text-xl font-black text-slate-950">{STATUS_LABELS[activeJob.status] || activeJob.status}</h2>
-                  </div>
-                  <StatusBadge status={activeJob.status} />
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <InfoRow label="Pickup" value={activeJob.pickupAddress} />
-                  <InfoRow label="Dropoff" value={activeJob.dropoffAddress} />
-                  <InfoRow label="Distance" value={activeJob.estimatedDistance ? `${activeJob.estimatedDistance} km` : 'Optimize first'} />
-                  <InfoRow label="ETA" value={activeJob.estimatedDuration ? `${activeJob.estimatedDuration} min` : 'Optimize first'} />
-                </div>
-              </div>
+              <StatusBadge status={activeJob.status} />
+              <h2 className="text-lg font-bold text-slate-900 mt-2 mb-4">Rider route</h2>
+              <RouteSummaryCard delivery={activeJob} />
 
-              <MapPreview delivery={activeJob} />
-
-              {(route || activeJob.routeSummary) && (
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <h3 className="text-sm font-black text-slate-950">Optimized route</h3>
-                  <p className="mt-2 text-sm font-semibold text-slate-600">{route?.routeSummary || activeJob.routeSummary}</p>
-                </div>
+              {!activeJob.routeId && !busyLabel && (
+                <button onClick={handleOptimizeRoute} disabled={isBusy} className="mt-3 w-full py-3 rounded-2xl border border-orange-200 bg-orange-50 text-orange-700 text-xs font-bold active:scale-95 transition">
+                  {busyLabel?.includes('Optimizing') ? 'Optimizing...' : 'Optimize route'}
+                </button>
               )}
 
-              <div className="grid grid-cols-1 gap-3">
-                <Button icon={Route} onClick={handleOptimizeRoute} disabled={isBusy || activeJob.status === 'COMPLETED'}>Optimize route</Button>
+              <div className="mt-5">
+                <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Delivery Progress</h3>
+                <DeliveryTimeline delivery={activeJob} events={events} />
+              </div>
+
+              <div className="mt-auto space-y-2 pt-4">
                 {nextStatus && (
-                  <Button icon={Truck} variant="warning" onClick={handleNextDriverStatus} disabled={isBusy}>
-                    Mark {STATUS_LABELS[nextStatus]}
-                  </Button>
+                  <button onClick={handleNextDriverStatus} disabled={isBusy} className="w-full py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-bold text-sm shadow-md inline-flex items-center justify-center gap-2 active:scale-95 transition">
+                    <Truck size={16} /> {driverActionLabel}
+                  </button>
                 )}
                 {activeJob.status === 'DELIVERED' && (
                   <Button icon={Check} variant="success" onClick={() => openReceiverConfirm(activeJob)} disabled={isBusy}>Receiver confirm</Button>
@@ -1276,35 +1345,42 @@ function App() {
   }
 
   if (view === 'confirmDelivery') {
+    const canConfirm = selectedDelivery?.status === 'DELIVERED';
     return (
       <Shell error={error} notice={notice} busyLabel={busyLabel}>
         <TopBar
-          title="Receiver confirm"
-          subtitle="POST /confirm"
+          title="Delivery confirmation"
+          subtitle={selectedDelivery?.deliveryId}
           onBack={() => setView(profile?.role === 'driver' ? 'driverJob' : 'seller')}
           onLogout={profile ? handleLogout : undefined}
         />
-        <form onSubmit={handleConfirmDelivery} className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <p className="text-sm font-black text-slate-950">Confirm after delivery is marked delivered.</p>
-            <p className="mt-2 text-sm font-semibold text-slate-500">Use the SMS token for unregistered receivers, or leave token blank when signed in as the registered receiver.</p>
-          </div>
-          <Field
-            label="Delivery ID"
-            icon={Package}
-            value={confirmForm.deliveryId}
-            onChange={(event) => setConfirmForm((current) => ({ ...current, deliveryId: event.target.value }))}
-            required
-          />
-          <Field
-            label="Confirmation token"
-            icon={ClipboardCheck}
-            value={confirmForm.confirmationToken}
-            onChange={(event) => setConfirmForm((current) => ({ ...current, confirmationToken: event.target.value }))}
-            placeholder="CONFIRM-..."
-          />
-          <Button type="submit" icon={Check} variant="success" disabled={isBusy}>Confirm delivery</Button>
-        </form>
+        <section className="flex-1 overflow-y-auto px-5 py-5 flex flex-col">
+          {!selectedDelivery && <EmptyState title="No delivery" body="Open a delivery first." />}
+          {selectedDelivery && (
+            <>
+              <StatusBadge status={selectedDelivery.status} />
+              <h2 className="text-lg font-bold text-slate-900 mt-2 mb-4">
+                {canConfirm ? 'Confirm your delivery' : 'Your package is on the way'}
+              </h2>
+              <RouteSummaryCard delivery={selectedDelivery} />
+              <div className="mt-5">
+                <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Delivery Progress</h3>
+                <DeliveryTimeline delivery={selectedDelivery} events={events} />
+              </div>
+
+              {error && <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg mt-3">{error}</p>}
+
+              <div className="mt-auto space-y-2 pt-4">
+                <button onClick={handleConfirmDelivery} disabled={!canConfirm || isBusy} className="w-full py-3.5 rounded-2xl bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white font-bold text-sm shadow-md inline-flex items-center justify-center gap-2 active:scale-95 transition">
+                  <CheckCircle2 size={16} /> Confirm Delivery
+                </button>
+                <button onClick={() => setView('seller')} className="w-full py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs font-bold inline-flex items-center justify-center gap-1.5 active:scale-95 transition">
+                  <AlertTriangle size={13} /> I did not receive this
+                </button>
+              </div>
+            </>
+          )}
+        </section>
       </Shell>
     );
   }
