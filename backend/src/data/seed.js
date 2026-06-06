@@ -1,0 +1,97 @@
+/**
+ * Seed data for the Mootive MVP.
+ *
+ * Users double as senders/receivers (a user can be both, per the docs).
+ * Riders carry the attributes the AI recommendation needs: trust score,
+ * estimated price, distance, and pickup time.
+ */
+
+const users = [
+  {
+    id: "user_001",
+    name: "Tunde Bakare",
+    phone: "08030000001",
+    username: "tunde",
+    receiverTag: "@tunde",
+    role: "both",
+  },
+  {
+    id: "user_002",
+    name: "Amaka Obi",
+    phone: "08030000002",
+    username: "amaka",
+    receiverTag: "@amaka",
+    role: "both",
+  },
+  {
+    id: "user_003",
+    name: "Chinedu Okeke",
+    phone: "08030000003",
+    username: "chinedu",
+    receiverTag: "@chinedu",
+    role: "both",
+  },
+  {
+    id: "user_004",
+    name: "Zainab Yusuf",
+    phone: "08030000004",
+    username: "zainab",
+    receiverTag: "@zainab",
+    role: "both",
+  },
+];
+
+const riders = [
+  {
+    id: "rider_A",
+    name: "Rider A — Musa",
+    location: "Yaba",
+    distanceKm: 6.2,
+    pickupMins: 25,
+    estimatedPrice: 2200,
+    trustScore: 68,
+    available: true,
+  },
+  {
+    id: "rider_B",
+    name: "Rider B — Grace",
+    location: "Sabo",
+    distanceKm: 3.1,
+    pickupMins: 14,
+    estimatedPrice: 2500,
+    trustScore: 91,
+    available: true,
+  },
+  {
+    id: "rider_C",
+    name: "Rider C — Emeka",
+    location: "Onike",
+    distanceKm: 1.8,
+    pickupMins: 9,
+    estimatedPrice: 2900,
+    trustScore: 84,
+    available: true,
+  },
+  {
+    id: "rider_D",
+    name: "Rider D — Bola",
+    location: "Akoka",
+    distanceKm: 4.7,
+    pickupMins: 19,
+    estimatedPrice: 2400,
+    trustScore: 76,
+    available: true,
+  },
+  {
+    id: "rider_E",
+    name: "Rider E — Ibrahim",
+    location: "Bariga",
+    distanceKm: 8.0,
+    pickupMins: 31,
+    estimatedPrice: 2050,
+    trustScore: 59,
+    available: true,
+  },
+];
+
+module.exports = { users, riders };
