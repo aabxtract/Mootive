@@ -1,23 +1,26 @@
 {
   "name": "mootive-backend",
-  "version": "1.0.0",
-  "description": "Backend API for Mootive — a delivery coordination app (hackathon MVP).",
-  "main": "server.js",
+  "version": "2.0.0",
+  "description": "AWS SAM backend for Mootive using Lambda, API Gateway, and DynamoDB.",
+  "main": "src/app.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "check": "node --check src/app.js && node --check src/lib/dynamo.js && node --check scripts/seed-demo-data.js",
+    "build": "sam build",
+    "deploy:guided": "sam deploy --guided",
+    "seed:demo": "node scripts/seed-demo-data.js"
   },
   "keywords": [
     "mootive",
-    "delivery",
-    "hackathon",
-    "express"
+    "aws",
+    "sam",
+    "lambda",
+    "dynamodb"
   ],
   "author": "Mootive Team",
   "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "@aws-sdk/client-dynamodb": "^3.817.0",
+    "@aws-sdk/lib-dynamodb": "^3.817.0"
   }
 }

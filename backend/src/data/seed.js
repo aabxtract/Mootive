@@ -1,11 +1,3 @@
-/**
- * Seed data for the Mootive MVP.
- *
- * Users double as senders/receivers (a user can be both, per the docs).
- * Riders carry the attributes the AI recommendation needs: trust score,
- * estimated price, distance, and pickup time.
- */
-
 const users = [
   {
     id: "user_001",
@@ -44,7 +36,7 @@ const users = [
 const riders = [
   {
     id: "rider_A",
-    name: "Rider A — Musa",
+    name: "Rider A - Musa",
     location: "Yaba",
     distanceKm: 6.2,
     pickupMins: 25,
@@ -54,7 +46,7 @@ const riders = [
   },
   {
     id: "rider_B",
-    name: "Rider B — Grace",
+    name: "Rider B - Grace",
     location: "Sabo",
     distanceKm: 3.1,
     pickupMins: 14,
@@ -64,7 +56,7 @@ const riders = [
   },
   {
     id: "rider_C",
-    name: "Rider C — Emeka",
+    name: "Rider C - Emeka",
     location: "Onike",
     distanceKm: 1.8,
     pickupMins: 9,
@@ -74,7 +66,7 @@ const riders = [
   },
   {
     id: "rider_D",
-    name: "Rider D — Bola",
+    name: "Rider D - Bola",
     location: "Akoka",
     distanceKm: 4.7,
     pickupMins: 19,
@@ -84,9 +76,9 @@ const riders = [
   },
   {
     id: "rider_E",
-    name: "Rider E — Ibrahim",
+    name: "Rider E - Ibrahim",
     location: "Bariga",
-    distanceKm: 8.0,
+    distanceKm: 8,
     pickupMins: 31,
     estimatedPrice: 2050,
     trustScore: 59,
