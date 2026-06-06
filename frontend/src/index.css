@@ -22,8 +22,8 @@ body,
 body {
   overflow: hidden;
   font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
-  color: #0f172a;
-  background: #e8edf3;
+  color: #000000;
+  background: #ffffff;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -53,15 +53,16 @@ button:disabled {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: rgb(0 0 0 / 0.24);
   border-radius: 999px;
 }
 
 .map-grid {
+  background-color: #ffffff;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.68) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.68) 1px, transparent 1px),
-    linear-gradient(135deg, rgba(148, 163, 184, 0.22), rgba(59, 130, 246, 0.1));
+    linear-gradient(rgb(0 0 0 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(0 0 0 / 0.06) 1px, transparent 1px),
+    linear-gradient(135deg, rgb(255 86 0 / 0.08), rgb(0 0 0 / 0.04));
   background-size: 28px 28px, 28px 28px, 100% 100%;
 }
 

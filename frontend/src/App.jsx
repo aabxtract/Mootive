@@ -21,8 +21,12 @@ import {
 } from 'lucide-react';
 import * as api from './lib/api';
 import * as auth from './lib/auth';
+import OnboardingCarousel from './OnboardingCarousel';
+import SplashScreen from './SplashScreen';
 
 const PENDING_PROFILE_KEY = 'mootive.pendingProfile';
+const ONBOARDING_COMPLETE_KEY = 'mootive.onboardingComplete';
+const SPLASH_DURATION_MS = 1700;
 
 const DEFAULT_COORDS = {
   pickupLat: 6.515,
@@ -80,6 +84,10 @@ function loadPendingProfile() {
   }
 }
 
+function hasCompletedOnboarding() {
+  return localStorage.getItem(ONBOARDING_COMPLETE_KEY) === 'true';
+}
+
 function readError(error) {
   return error?.data?.message || error?.message || 'Something went wrong.';
 }
@@ -126,17 +134,17 @@ function formatMoney(value) {
 }
 
 function statusTone(status) {
-  if (status === 'COMPLETED' || status === 'CONFIRMED') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (status === 'DELIVERED' || status === 'IN_TRANSIT' || status === 'PICKED_UP') return 'bg-sky-50 text-sky-700 border-sky-200';
-  if (status === 'ISSUE_REPORTED') return 'bg-rose-50 text-rose-700 border-rose-200';
-  if (status === 'OPEN_FOR_DRIVERS' || status === 'DRIVER_ACCEPTED' || status === 'ROUTE_OPTIMIZED') return 'bg-amber-50 text-amber-700 border-amber-200';
-  return 'bg-slate-50 text-slate-700 border-slate-200';
+  if (status === 'COMPLETED' || status === 'CONFIRMED') return 'bg-black text-white border-black';
+  if (status === 'ISSUE_REPORTED') return 'bg-[#FF5600] text-white border-[#FF5600]';
+  if (status === 'DELIVERED' || status === 'IN_TRANSIT' || status === 'PICKED_UP') return 'bg-[#FF5600]/10 text-[#FF5600] border-[#FF5600]/25';
+  if (status === 'OPEN_FOR_DRIVERS' || status === 'DRIVER_ACCEPTED' || status === 'ROUTE_OPTIMIZED') return 'bg-[#FF5600]/10 text-[#FF5600] border-[#FF5600]/25';
+  return 'bg-white text-black border-black/15';
 }
 
 function Shell({ children, error, notice, busyLabel }) {
   return (
-    <div className="min-h-screen bg-[#e8edf3] text-slate-950">
-      <main className="mx-auto flex h-screen w-full max-w-[430px] flex-col bg-[#f8fafc] shadow-xl sm:my-4 sm:h-[calc(100vh-2rem)] sm:rounded-lg sm:border sm:border-white/80">
+    <div className="min-h-screen bg-white text-black">
+      <main className="mx-auto flex h-screen w-full max-w-[430px] flex-col bg-white shadow-xl sm:my-4 sm:h-[calc(100vh-2rem)] sm:rounded-lg sm:border sm:border-black/10">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {(error || notice || busyLabel) && (
             <div className="border-b border-slate-200 bg-white px-4 py-3">
@@ -197,11 +205,11 @@ function TopBar({ title, subtitle, onBack, onLogout, action }) {
 
 function Button({ children, icon: Icon, variant = 'primary', className = '', disabled, ...props }) {
   const styles = {
-    primary: 'bg-slate-950 text-white border-slate-950',
-    secondary: 'bg-white text-slate-900 border-slate-200',
-    success: 'bg-emerald-600 text-white border-emerald-600',
-    warning: 'bg-amber-500 text-slate-950 border-amber-500',
-    ghost: 'bg-transparent text-slate-700 border-transparent',
+    primary: 'bg-[#FF5600] text-white border-[#FF5600]',
+    secondary: 'bg-white text-black border-black/15',
+    success: 'bg-[#FF5600] text-white border-[#FF5600]',
+    warning: 'bg-[#FF5600] text-white border-[#FF5600]',
+    ghost: 'bg-transparent text-black/70 border-transparent',
   };
   return (
     <button
@@ -345,6 +353,8 @@ function DeliveryCard({ delivery, onClick, actionLabel, actionIcon: ActionIcon =
 }
 
 function App() {
+  const [showSplash, setShowSplash] = useState(true);
+  const [onboardingComplete, setOnboardingComplete] = useState(hasCompletedOnboarding);
   const [view, setView] = useState('loading');
   const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', phoneNumber: '', password: '', code: '' });
@@ -446,6 +456,36 @@ function App() {
     }
   }
 
+  function completeOnboarding() {
+    localStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
+    setOnboardingComplete(true);
+    setShowSplash(false);
+    setView('auth');
+  }
+
+  function resetOnboarding() {
+    localStorage.removeItem(ONBOARDING_COMPLETE_KEY);
+    setOnboardingComplete(false);
+    setShowSplash(false);
+    setView('auth');
+  }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setShowSplash(false);
+    }, SPLASH_DURATION_MS);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+    window.mootiveResetOnboarding = resetOnboarding;
+    return () => {
+      delete window.mootiveResetOnboarding;
+    };
+  });
+
   useEffect(() => {
     let alive = true;
 
@@ -453,6 +493,11 @@ function App() {
       setBusyLabel('Checking session');
       setError('');
       try {
+        if (!hasCompletedOnboarding()) {
+          if (alive) setView('auth');
+          return;
+        }
+
         if (!auth.env.apiUrl || !auth.hasCognitoConfig()) {
           if (alive) {
             setNotice('Add VITE_API_BASE_URL and Cognito values in frontend/.env.');
@@ -772,6 +817,14 @@ function App() {
     });
   }
 
+  if (showSplash) {
+    return <SplashScreen />;
+  }
+
+  if (!onboardingComplete) {
+    return <OnboardingCarousel onComplete={completeOnboarding} onReset={resetOnboarding} showReset={import.meta.env.DEV} />;
+  }
+
   if (view === 'loading') {
     return (
       <Shell error={error} notice={notice} busyLabel={busyLabel}>
@@ -844,6 +897,16 @@ function App() {
               <Button type="submit" icon={Check} disabled={isBusy}>Confirm account</Button>
               <Button variant="secondary" onClick={handleResendCode} disabled={isBusy}>Resend code</Button>
             </form>
+          )}
+
+          {import.meta.env.DEV && (
+            <button
+              type="button"
+              onClick={resetOnboarding}
+              className="mx-auto mt-8 block text-xs font-bold text-slate-500 underline underline-offset-4"
+            >
+              Replay onboarding
+            </button>
           )}
         </section>
       </Shell>
