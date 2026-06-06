@@ -12,27 +12,28 @@ import {
 let configured = false;
 
 export const env = {
-  apiUrl: (localStorage.getItem('MOOTIVE_API_URL') || import.meta.env.VITE_API_URL || '').replace(/\/$/, ''),
-  region: import.meta.env.VITE_REGION || 'us-east-1',
-  userPoolId: import.meta.env.VITE_USER_POOL_ID,
-  userPoolClientId: import.meta.env.VITE_USER_POOL_CLIENT_ID,
-  identityPoolId: import.meta.env.VITE_IDENTITY_POOL_ID,
+  apiUrl: (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').replace(/\/$/, ''),
+  region: import.meta.env.VITE_AWS_REGION || import.meta.env.VITE_REGION || 'us-east-1',
+  userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || import.meta.env.VITE_USER_POOL_ID,
+  userPoolClientId: import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID || import.meta.env.VITE_USER_POOL_CLIENT_ID,
+  identityPoolId: import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID || import.meta.env.VITE_IDENTITY_POOL_ID,
   mapName: import.meta.env.VITE_MAP_NAME || 'mootive-map',
   placeIndexName: import.meta.env.VITE_PLACE_INDEX_NAME || 'mootive-places',
 };
-
-export function setApiUrl(url) {
-  const clean = url.trim().replace(/\/$/, '');
-  localStorage.setItem('MOOTIVE_API_URL', clean);
-  env.apiUrl = clean;
-}
 
 export function hasCognitoConfig() {
   return Boolean(env.userPoolId && env.userPoolClientId);
 }
 
+function requireCognitoConfig() {
+  if (!hasCognitoConfig()) {
+    throw new Error('Cognito is not configured. Set VITE_COGNITO_USER_POOL_ID and VITE_COGNITO_USER_POOL_CLIENT_ID.');
+  }
+}
+
 export function configureAmplify() {
   if (configured || !hasCognitoConfig()) return;
+
   Amplify.configure({
     Auth: {
       Cognito: {
@@ -46,7 +47,10 @@ export function configureAmplify() {
       ? {
           LocationService: {
             region: env.region,
-            maps: { items: { [env.mapName]: { style: 'VectorEsriNavigation' } }, default: env.mapName },
+            maps: {
+              items: { [env.mapName]: { style: 'VectorEsriNavigation' } },
+              default: env.mapName,
+            },
             search_indices: { items: [env.placeIndexName], default: env.placeIndexName },
           },
         }
@@ -56,17 +60,8 @@ export function configureAmplify() {
 }
 
 export async function signup({ name, email, phoneNumber, password }) {
+  requireCognitoConfig();
   configureAmplify();
-  if (!hasCognitoConfig()) {
-    return {
-      userId: `local-${Date.now()}`,
-      cognitoSub: `local-${Date.now()}`,
-      email,
-      name,
-      phoneNumber,
-      nextStep: { signUpStep: 'DONE' },
-    };
-  }
   const userAttributes = { email };
   if (name) userAttributes.name = name;
   if (phoneNumber) userAttributes.phone_number = phoneNumber;
@@ -74,25 +69,20 @@ export async function signup({ name, email, phoneNumber, password }) {
 }
 
 export async function confirmSignup({ email, code }) {
+  requireCognitoConfig();
   configureAmplify();
   return cognitoConfirm({ username: email, confirmationCode: code });
 }
 
 export async function resendCode(email) {
+  requireCognitoConfig();
   configureAmplify();
   return cognitoResend({ username: email });
 }
 
 export async function login(email, password) {
+  requireCognitoConfig();
   configureAmplify();
-  if (!hasCognitoConfig()) {
-    return {
-      userId: `local-${email || 'user'}`,
-      cognitoSub: `local-${email || 'user'}`,
-      email,
-      nextStep: { signInStep: 'DONE' },
-    };
-  }
   try {
     await cognitoSignOut();
   } catch {
@@ -103,7 +93,8 @@ export async function login(email, password) {
 
 export async function logout() {
   configureAmplify();
-  if (hasCognitoConfig()) await cognitoSignOut();
+  if (!hasCognitoConfig()) return;
+  await cognitoSignOut();
 }
 
 export async function currentAuthUser() {

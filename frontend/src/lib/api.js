@@ -1,7 +1,7 @@
 import { env, authToken } from './auth';
 
 async function request(method, path, body, { auth = true } = {}) {
-  if (!env.apiUrl) throw new Error('API base URL not set. Open Settings on the phone frame.');
+  if (!env.apiUrl) throw new Error('API base URL not set. Add VITE_API_BASE_URL to frontend/.env.');
   const headers = { 'Content-Type': 'application/json' };
   if (auth) {
     const token = await authToken();
