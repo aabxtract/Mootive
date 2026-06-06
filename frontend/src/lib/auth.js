@@ -12,11 +12,11 @@ import {
 let configured = false;
 
 export const env = {
-  apiUrl: (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '').replace(/\/$/, ''),
-  region: import.meta.env.VITE_AWS_REGION || import.meta.env.VITE_REGION || 'us-east-1',
-  userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || import.meta.env.VITE_USER_POOL_ID,
-  userPoolClientId: import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID || import.meta.env.VITE_USER_POOL_CLIENT_ID,
-  identityPoolId: import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID || import.meta.env.VITE_IDENTITY_POOL_ID,
+  apiUrl: (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, ''),
+  region: import.meta.env.VITE_AWS_REGION || 'us-east-1',
+  userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
+  userPoolClientId: import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID,
+  identityPoolId: import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID,
   mapName: import.meta.env.VITE_MAP_NAME || 'mootive-map',
   placeIndexName: import.meta.env.VITE_PLACE_INDEX_NAME || 'mootive-places',
 };
