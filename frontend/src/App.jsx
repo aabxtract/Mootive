@@ -29,8 +29,6 @@ import * as api from './lib/api';
 import * as auth from './lib/auth';
 import OnboardingCarousel from './OnboardingCarousel';
 import SplashScreen from './SplashScreen';
-import DeliveryTimeline from './components/DeliveryTimeline';
-import RouteSummaryCard from './components/RouteSummaryCard';
 
 const PENDING_PROFILE_KEY = 'mootive.pendingProfile';
 const ONBOARDING_COMPLETE_KEY = 'mootive.onboardingComplete';
@@ -1220,11 +1218,6 @@ function App() {
             <>
               <StatusBadge status={selectedDelivery.status} />
               <h2 className="text-lg font-bold text-slate-900 mt-1">Delivery tracking</h2>
-              <RouteSummaryCard delivery={selectedDelivery} />
-              <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Delivery Progress</h3>
-                <DeliveryTimeline delivery={selectedDelivery} events={events} />
-              </div>
               <div className="grid grid-cols-1 gap-3 pt-2">
                 <Button icon={ShieldCheck} onClick={handleAnalyzeDelivery} disabled={isBusy}>Analyze delivery</Button>
                 {selectedDelivery.status === 'DELIVERED' && (
@@ -1316,18 +1309,12 @@ function App() {
             <>
               <StatusBadge status={activeJob.status} />
               <h2 className="text-lg font-bold text-slate-900 mt-2 mb-4">Rider route</h2>
-              <RouteSummaryCard delivery={activeJob} />
 
               {!activeJob.routeId && !busyLabel && (
                 <button onClick={handleOptimizeRoute} disabled={isBusy} className="mt-3 w-full py-3 rounded-2xl border border-orange-200 bg-orange-50 text-orange-700 text-xs font-bold active:scale-95 transition">
                   {busyLabel?.includes('Optimizing') ? 'Optimizing...' : 'Optimize route'}
                 </button>
               )}
-
-              <div className="mt-5">
-                <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Delivery Progress</h3>
-                <DeliveryTimeline delivery={activeJob} events={events} />
-              </div>
 
               <div className="mt-auto space-y-2 pt-4">
                 {nextStatus && (
@@ -1364,11 +1351,6 @@ function App() {
               <h2 className="text-lg font-bold text-slate-900 mt-2 mb-4">
                 {canConfirm ? 'Confirm your delivery' : 'Your package is on the way'}
               </h2>
-              <RouteSummaryCard delivery={selectedDelivery} />
-              <div className="mt-5">
-                <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Delivery Progress</h3>
-                <DeliveryTimeline delivery={selectedDelivery} events={events} />
-              </div>
 
               {error && <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg mt-3">{error}</p>}
 
