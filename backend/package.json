@@ -1,0 +1,26 @@
+{
+  "name": "mootive-backend",
+  "version": "2.0.0",
+  "description": "AWS SAM backend for Mootive using Lambda, API Gateway, and DynamoDB.",
+  "main": "src/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "check": "node --check src/app.js && node --check src/lib/dynamo.js && node --check scripts/seed-demo-data.js",
+    "build": "sam build",
+    "deploy:guided": "sam deploy --guided",
+    "seed:demo": "node scripts/seed-demo-data.js"
+  },
+  "keywords": [
+    "mootive",
+    "aws",
+    "sam",
+    "lambda",
+    "dynamodb"
+  ],
+  "author": "Mootive Team",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.817.0",
+    "@aws-sdk/lib-dynamodb": "^3.817.0"
+  }
+}
