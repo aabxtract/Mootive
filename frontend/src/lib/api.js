@@ -5,7 +5,13 @@ async function request(method, path, body, { auth = true } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (auth) {
     const token = await authToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (!token) {
+      const err = new Error('Your sign-in session is not ready. Please sign in again.');
+      err.status = 401;
+      err.code = 'NO_AUTH_SESSION';
+      throw err;
+    }
+    headers.Authorization = `Bearer ${token}`;
   }
   const res = await fetch(`${env.apiUrl}${path}`, {
     method,

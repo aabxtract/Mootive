@@ -10,6 +10,8 @@ import {
 } from 'aws-amplify/auth';
 
 let configured = false;
+const SESSION_WAIT_ATTEMPTS = 8;
+const SESSION_WAIT_DELAY_MS = 250;
 
 export const env = {
   apiUrl: (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, ''),
@@ -88,7 +90,13 @@ export async function login(email, password) {
   } catch {
     // A missing previous session should not block a fresh login.
   }
-  return cognitoSignIn({ username: email, password, options: { authFlowType: 'USER_PASSWORD_AUTH' } });
+  const result = await cognitoSignIn({ username: email, password, options: { authFlowType: 'USER_PASSWORD_AUTH' } });
+  if (!result.isSignedIn) {
+    const step = result.nextStep?.signInStep || 'the next sign-in step';
+    throw new Error(`Sign in is not complete. Complete ${step} first.`);
+  }
+  await waitForAuthSession();
+  return result;
 }
 
 export async function logout() {
@@ -102,7 +110,7 @@ export async function currentAuthUser() {
   if (!hasCognitoConfig()) return null;
   try {
     const user = await getCurrentUser();
-    const session = await fetchAuthSession();
+    const session = await waitForAuthSession();
     const claims = session.tokens?.idToken?.payload || {};
     return {
       username: user.username,
@@ -114,12 +122,38 @@ export async function currentAuthUser() {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function idTokenFromSession(session) {
+  return session?.tokens?.idToken || null;
+}
+
+export async function waitForAuthSession({ forceRefresh = false } = {}) {
+  configureAmplify();
+  requireCognitoConfig();
+  let lastError = null;
+  for (let attempt = 0; attempt < SESSION_WAIT_ATTEMPTS; attempt += 1) {
+    try {
+      const session = await fetchAuthSession({ forceRefresh: forceRefresh && attempt === 0 });
+      if (idTokenFromSession(session)) return session;
+    } catch (err) {
+      lastError = err;
+    }
+    await sleep(SESSION_WAIT_DELAY_MS);
+  }
+  const err = new Error('Your sign-in session is not ready. Please sign in again.');
+  err.cause = lastError;
+  throw err;
+}
+
 export async function authToken() {
   configureAmplify();
   if (!hasCognitoConfig()) return null;
   try {
-    const session = await fetchAuthSession();
-    return session.tokens?.idToken?.toString() || null;
+    const session = await waitForAuthSession();
+    return idTokenFromSession(session)?.toString() || null;
   } catch {
     return null;
   }

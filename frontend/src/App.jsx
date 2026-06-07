@@ -489,6 +489,11 @@ function App() {
         setView('seller');
       }
     } catch (err) {
+      if (err.code === 'NO_AUTH_SESSION') {
+        setProfile(null);
+        setView('auth');
+        throw err;
+      }
       if (err.status === 401 || err.status === 404) {
         const pending = loadPendingProfile();
         setProfile(null);
@@ -661,6 +666,7 @@ function App() {
     await runTask('Signing in', async () => {
       await auth.login(authForm.email.trim().toLowerCase(), authForm.password);
       const identity = await auth.currentAuthUser();
+      if (!identity) throw new Error('Sign in succeeded, but no Cognito session was found. Please sign in again.');
       setAuthIdentity(identity);
       await syncProfile(identity);
     });
@@ -669,6 +675,9 @@ function App() {
   async function handleRoleSubmit(event) {
     event.preventDefault();
     await runTask('Saving profile', async () => {
+      const identity = await auth.currentAuthUser();
+      if (!identity) throw new Error('Your sign-in session expired. Please sign in again.');
+      setAuthIdentity(identity);
       const userResult = await api.createUserProfile({
         name: roleForm.name.trim(),
         phoneNumber: normalizePhone(roleForm.phoneNumber),
